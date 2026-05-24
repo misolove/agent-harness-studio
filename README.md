@@ -5,6 +5,13 @@ AI 에이전트의 하네스(메모리·스킬·훅·MCP·루트 컨텍스트)�
 ## 핵심 철학: Harness over Model
 모델 자체의 성능보다 에이전트의 작업 환경(Harness) 설계를 고도화하는 것이 실질적인 에이전트 생산성을 결정합니다.
 
+<div align="center">
+  <img src="docs/assets/architecture.svg" width="600" alt="Architecture Diagram">
+</div>
+
+### 📺 소개 영상
+프로젝트의 핵심 흐름을 담은 [소개 영상](docs/assets/agent-harness-studio-intro.mp4)을 확인해보세요.
+
 ## 주요 기능
 - **Harness Inspector**: 분산된 설정 파일과 메모리를 한눈에 시각화
 - **Chat Molder**: 자연어 대화로 하네스 구성요소 즉시 수정 및 반영

@@ -153,7 +153,7 @@ function App() {
       <header className="app-header">
         <div className="header-left">
           <h1>Agent Harness Studio</h1>
-          <p className="subtitle">Hermes Local Workspace</p>
+          <p className="subtitle">Hermes Local Workspace Control Tower</p>
         </div>
         {envInfo && (
           <div className="header-right">
@@ -166,6 +166,19 @@ function App() {
           </div>
         )}
       </header>
+
+      {/* Hero / Intro Section */}
+      {!selectedSection && !editingItem && !molderResponse && (
+        <section className="hero-section">
+          <div className="hero-content">
+            <h2>Harness over Model</h2>
+            <p>Visualize and refine your AI agent's environment systematically.</p>
+          </div>
+          <div className="hero-visual">
+             <img src="/docs/assets/architecture.svg" alt="Architecture Diagram" className="architecture-svg" />
+          </div>
+        </section>
+      )}
 
       {error && <div className="error-banner">Connection Error: {error}</div>}
       {loading && <div className="loading">Scanning harness...</div>}
