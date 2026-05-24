@@ -1,17 +1,25 @@
-"""
-Agent Harness Studio - FastAPI Backend
-Serves scan results from HermesScanner via REST API.
-"""
-
 import sys
 import os
+import yaml
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+import subprocess
+import json
+from openai import OpenAI
 
 # Add src/ to path so we can import scanner
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from fastapi import FastAPI, HTTPException
+# Determine Harness Home — allow override for testing
+DEFAULT_HERMES_HOME = Path.home() / ".hermes"
+HERMES_HOME = Path(os.environ.get("HERMES_HOME", str(DEFAULT_HERMES_HOME)))
+
+print(f"=====================================")
+print(f"🚀 AGENT HARNESS STUDIO STARTING")
+print(f"📁 Target HERMES_HOME: {HERMES_HOME}")
+print(f"=====================================")
+
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
@@ -34,6 +42,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize OpenAI client for 9router
+def get_llm_client():
+    config_path = HERMES_HOME / "config.yaml"
+    base_url = "http://127.0.0.1:20128/v1"
+    api_key = "dummy" # 9router may not strictly require one, or we pull from config
+    
+    if config_path.exists():
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                c = yaml.safe_load(f)
+                if c.get("base_url"):
+                    base_url = c["base_url"]
+                # Hermes config structure fallback
+                custom = c.get("providers", {}).get("custom", {})
+                for k, v in custom.items():
+                    if "20128" in str(v.get("base_url")):
+                        base_url = v.get("base_url")
+                        api_key = v.get("api_key", api_key)
+        except Exception:
+            pass
+            
+    return OpenAI(base_url=base_url, api_key=api_key)
 
 # Section type mapping
 SECTION_TYPE_MAP: Dict[str, List[str]] = {
@@ -71,7 +102,7 @@ def build_response(items: List[Dict[str, Any]]) -> Dict[str, Any]:
 def scan_all():
     """Return full harness scan results."""
     try:
-        scanner = HermesScanner()
+        scanner = HermesScanner(str(HERMES_HOME))
         items = scanner.scan_all()
         return build_response(items)
     except Exception as e:
@@ -92,7 +123,7 @@ def scan_section(section: str):
         )
 
     try:
-        scanner = HermesScanner()
+        scanner = HermesScanner(str(HERMES_HOME))
         all_items = scanner.scan_all()
         allowed_types = SECTION_TYPE_MAP[section]
         filtered = [i for i in all_items if i.get("type") in allowed_types]
@@ -100,6 +131,133 @@ def scan_section(section: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- Chat Molder & Editing API ---
+
+MOLDER_SYSTEM_PROMPT = """You are a Harness Molder — an expert at designing and modifying AI agent harness configurations.
+
+The user will describe what they want their agent to do or change. You must respond with a JSON object describing the action to take.
+
+Your response MUST be a valid JSON object with this structure:
+{
+  "action": "CREATE_SKILL" | "UPDATE_SKILL" | "UPDATE_CONFIG" | "ADD_MCP" | "SUGGESTION",
+  "name": "skill-or-item-name (kebab-case)",
+  "description": "Short description of what this does",
+  "message": "Human-readable explanation of what you're proposing",
+  "content": "The full file content to create or replace (YAML frontmatter + Markdown body for skills)",
+  "diff_summary": "Brief summary of changes in plain language"
+}
+
+For CREATE_SKILL: provide complete SKILL.md content with YAML frontmatter (name, description, metadata.hermes.tags, metadata.hermes.category) followed by detailed markdown instructions.
+For UPDATE_SKILL: provide the updated content.
+For SUGGESTION: use message field to explain what should be done manually.
+For ADD_MCP: provide the MCP server config as YAML in content.
+
+Always respond with ONLY the JSON object, no other text."""
+
+@app.post("/api/mold")
+def mold_harness(prompt: str = Body(..., embed=True)):
+    """
+    Chat Molder: Uses LLM to generate/modify harness items based on natural language prompt.
+    Connects to local 9router (OpenAI-compatible API) for LLM inference.
+    """
+    raw = ""
+    try:
+        client = get_llm_client()
+        
+        # Build context from current harness state
+        scanner = HermesScanner(str(HERMES_HOME))
+        items = scanner.scan_all()
+        
+        # Summarize current harness for LLM context
+        skill_names = [i["name"] for i in items if i["type"] == "Skill"][:20]
+        mcp_names = [i["name"] for i in items if i["type"] == "MCP Server"]
+        
+        context_msg = f"""Current harness state:
+- Skills installed ({len(skill_names)} shown): {', '.join(skill_names)}
+- MCP servers: {', '.join(mcp_names)}
+
+User request: {prompt}"""
+
+        response = client.chat.completions.create(
+            model="qwen",
+            messages=[
+                {"role": "system", "content": MOLDER_SYSTEM_PROMPT},
+                {"role": "user", "content": context_msg}
+            ],
+            temperature=0.7,
+            max_tokens=2000,
+        )
+        
+        raw = response.choices[0].message.content or ""
+        raw = raw.strip()
+        
+        # Try to parse as JSON
+        # Handle markdown code blocks
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+            if raw.endswith("```"):
+                raw = raw[:-3]
+            raw = raw.strip()
+        
+        result = json.loads(raw)
+        
+        # Build a git-style diff from content
+        diff_lines = []
+        if result.get("content"):
+            action = result.get("action", "CREATE_SKILL")
+            name = result.get("name", "unknown")
+            if "SKILL" in action:
+                path = f"skills/{name}/SKILL.md"
+            elif "MCP" in action:
+                path = "config.yaml (mcp_servers section)"
+            else:
+                path = f"config.yaml"
+            
+            diff_lines.append(f"+++ b/{path}")
+            for line in result["content"].split("\n"):
+                diff_lines.append(f"+{line}")
+        
+        return {
+            "status": "success",
+            "action": result.get("action", "SUGGESTION"),
+            "name": result.get("name", ""),
+            "description": result.get("description", ""),
+            "message": result.get("message", ""),
+            "content": result.get("content", ""),
+            "diff": "\n".join(diff_lines),
+            "diff_summary": result.get("diff_summary", ""),
+        }
+        
+    except json.JSONDecodeError:
+        # LLM didn't return valid JSON — return raw text as suggestion
+        fallback_msg = raw if raw else "LLM response was not valid JSON"
+        return {
+            "status": "success",
+            "action": "SUGGESTION",
+            "name": "",
+            "message": fallback_msg,
+            "content": "",
+            "diff": "",
+            "diff_summary": "LLM returned non-structured output. See message.",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LLM call failed: {str(e)}")
+
+@app.post("/api/save")
+def save_item(path: str = Body(...), content: str = Body(...)):
+    """Save an edited harness item (Skill, Context, Config)."""
+    target_path = Path(path)
+    
+    # Security: only allow saving within HERMES_HOME
+    if not str(target_path.resolve()).startswith(str(HERMES_HOME.resolve())):
+        raise HTTPException(status_code=403, detail="Access denied: outside .hermes")
+
+    try:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(content, encoding='utf-8')
+        return {"status": "saved", "path": str(target_path)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
 def health():
