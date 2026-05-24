@@ -6,6 +6,11 @@ from typing import List, Dict, Any, Optional
 import subprocess
 import json
 from openai import OpenAI
+from dotenv import load_dotenv
+
+# Load project-local .env (never commit secrets)
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(PROJECT_ROOT / ".env")
 
 # Add src/ to path so we can import scanner
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -275,19 +280,60 @@ def get_env():
 @app.post("/api/web/scrape")
 def web_scrape(url: str = Body(..., embed=True)):
     """
-    Web Context Scraper Prototype. Integration with Firecrawl SDK will go here.
+    Web Context Scraper powered by Firecrawl.
+
+    Requires FIRECRAWL_API_KEY in the project .env or process environment.
     """
     if not url:
         return {"status": "error", "message": "URL is required"}
-    
-    # Mock response for prototype
-    return {
-        "status": "ok",
-        "url": url,
-        "title": f"Extracted: {url}",
-        "markdown": f"# Content from {url}\n\nThis is a placeholder for scraped content. Integration with Firecrawl is in progress.",
-        "metadata": {"source": "firecrawl-prototype"}
-    }
+
+    api_key = os.environ.get("FIRECRAWL_API_KEY")
+    if not api_key:
+        return {
+            "status": "missing_api_key",
+            "message": "Set FIRECRAWL_API_KEY in .env to enable real web scraping.",
+            "url": url,
+        }
+
+    try:
+        from firecrawl import FirecrawlApp
+
+        app_fc = FirecrawlApp(api_key=api_key)
+        scrape_fn = getattr(app_fc, "scrape_url", None) or getattr(app_fc, "scrape")
+        result = scrape_fn(url, formats=["markdown"])
+
+        # Firecrawl SDK may return dict-like or object-like results depending on version.
+        if hasattr(result, "dict"):
+            result_data: Dict[str, Any] = result.dict()
+        elif hasattr(result, "model_dump"):
+            result_data = result.model_dump()
+        elif isinstance(result, dict):
+            result_data = result
+        else:
+            result_data = {"raw": str(result)}
+
+        data_block = result_data.get("data") if isinstance(result_data.get("data"), dict) else {}
+        markdown = result_data.get("markdown") or data_block.get("markdown") or ""
+        metadata = result_data.get("metadata") or data_block.get("metadata") or {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+        title = metadata.get("title") or result_data.get("title") or url
+
+        return {
+            "status": "ok",
+            "url": url,
+            "title": title,
+            "markdown": markdown,
+            "metadata": metadata,
+            "source": "firecrawl",
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e),
+            "url": url,
+            "source": "firecrawl",
+        }
 
 
 if __name__ == "__main__":

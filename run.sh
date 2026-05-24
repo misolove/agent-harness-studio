@@ -22,10 +22,17 @@ if ! command -v node &>/dev/null; then
   exit 1
 fi
 
+# Create/use local virtualenv for Python deps
+if [ ! -d "$PROJECT_ROOT/.venv" ]; then
+  echo "📦 Creating Python virtualenv..."
+  python3 -m venv "$PROJECT_ROOT/.venv"
+fi
+source "$PROJECT_ROOT/.venv/bin/activate"
+
 # Install Python deps if needed
-if ! python3 -c "import fastapi" 2>/dev/null; then
+if ! python -c "import fastapi, firecrawl, dotenv" 2>/dev/null; then
   echo "📦 Installing Python dependencies..."
-  pip3 install -r "$PROJECT_ROOT/requirements.txt"
+  pip install -r "$PROJECT_ROOT/requirements.txt"
 fi
 
 # Install Node deps if needed
@@ -45,7 +52,7 @@ trap cleanup SIGINT SIGTERM
 # Start Backend
 echo "🚀 Starting Backend on http://127.0.0.1:8766"
 cd "$PROJECT_ROOT"
-python3 "$BACKEND_DIR/app.py" &
+python "$BACKEND_DIR/app.py" &
 BACKEND_PID=$!
 
 # Start Frontend

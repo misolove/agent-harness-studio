@@ -50,13 +50,20 @@ echo ""
 
 export HERMES_HOME="$SANDBOX_DIR"
 
-# Source venv if exists
-if [ -f "$PROJECT_ROOT/venv/bin/activate" ]; then
-    source "$PROJECT_ROOT/venv/bin/activate"
+# Create/use local virtualenv for Python deps
+if [ ! -d "$PROJECT_ROOT/.venv" ]; then
+    echo "📦 Creating Python virtualenv..."
+    python3 -m venv "$PROJECT_ROOT/.venv"
+fi
+source "$PROJECT_ROOT/.venv/bin/activate"
+
+if ! python -c "import fastapi, firecrawl, dotenv" 2>/dev/null; then
+    echo "📦 Installing Python dependencies..."
+    pip install -r "$PROJECT_ROOT/requirements.txt"
 fi
 
 # Start Backend
-python3 "$PROJECT_ROOT/src/server/app.py" &
+python "$PROJECT_ROOT/src/server/app.py" &
 BACKEND_PID=$!
 
 # Start Frontend
