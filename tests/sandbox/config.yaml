@@ -320,7 +320,7 @@ tts:
   providers:
     omnivoice-qwen3:
       type: command
-      command: /Users/letitbe/.hermes/hermes-agent/venv/bin/python /Users/letitbe/.hermes/scripts/omnivoice_qwen3_tts.py
+      command: ~/.hermes/hermes-agent/venv/bin/python ~/.hermes/scripts/omnivoice_qwen3_tts.py
         --text-path {input_path} --output-path {output_path} --voice {voice} --speed
         {speed}
       output_format: ogg
@@ -329,7 +329,7 @@ tts:
       timeout_seconds: 120
     supertonic-local:
       type: command
-      command: /Users/letitbe/.hermes/scripts/supertonic_tts.py --text-path {input_path}
+      command: ~/.hermes/scripts/supertonic_tts.py --text-path {input_path}
         --output-path {output_path} --voice {voice} --speed {speed}
       output_format: ogg
       voice: F1
@@ -465,7 +465,7 @@ command_allowlist:
 quick_commands: {}
 hooks:
   pre_tool_call:
-  - command: /Users/letitbe/.hermes/scripts/vision_delegation_hook.py
+  - command: ~/.hermes/scripts/vision_delegation_hook.py
     matcher: vision_analyze
     timeout: 120
 hooks_auto_accept: false
@@ -549,16 +549,16 @@ custom_providers:
 group_sessions_per_user: true
 mcp_servers:
   omnivoice:
-    command: /Users/letitbe/.hermes/hermes-agent/venv/bin/python
+    command: ~/.hermes/hermes-agent/venv/bin/python
     args:
-    - /Users/letitbe/.hermes/scripts/omnivoice_mcp.py
+    - ~/.hermes/scripts/omnivoice_mcp.py
     env:
       OMNIVOICE_API_URL: http://localhost:3900
     enabled: true
     timeout: 120
     connect_timeout: 15
   dartlab:
-    command: /Users/letitbe/.hermes/scripts/dartlab_mcp.sh
+    command: ~/.hermes/scripts/dartlab_mcp.sh
     enabled: true
   ouroboros:
     args:
@@ -571,9 +571,9 @@ mcp_servers:
     - serve
     command: uvx
   mem0-local:
-    command: /Users/letitbe/.hermes/mcp/mem0-local/.venv/bin/python
+    command: ~/.hermes/mcp/mem0-local/.venv/bin/python
     args:
-    - /Users/letitbe/.hermes/mcp/mem0-local/mem0_mcp_server.py
+    - ~/.hermes/mcp/mem0-local/mem0_mcp_server.py
     env:
       MEM0_API_URL: http://localhost:8888
       MEM0_USER_ID: hermes
@@ -585,9 +585,9 @@ mcp_servers:
       Authorization: Bearer f11d95ce0f0d4d2787e8addbdd4413b1.q3uNHMnHUGueGq36
     enabled: true
   vibe-trading:
-    command: /Users/letitbe/Developer/Vibe-Trading/.venv/bin/python
+    command: /path/to/python
     args:
-    - /Users/letitbe/Developer/Vibe-Trading/agent/mcp_server.py
+    - /path/to/mcp_server.py
     timeout: 600
     connect_timeout: 60
     env:
@@ -599,7 +599,7 @@ mcp_servers:
   qmd:
     enabled: true
     type: stdio
-    command: /Users/letitbe/.bun/bin/qmd
+    command: /path/to/qmd
     args:
     - mcp
     timeout: 600
@@ -616,7 +616,7 @@ mcp_servers:
     connect_timeout: 60
   leann:
     enabled: true
-    command: /Users/letitbe/Developer/LEANN/.venv/bin/python
+    command: /path/to/python
     args:
     - -m
     - leann.mcp

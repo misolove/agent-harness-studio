@@ -11,7 +11,7 @@ Base URL: `http://127.0.0.1:8766`
 **Response:**
 ```json
 {
-  "hermes_home": "/Users/letitbe/.hermes/sandbox",
+  "hermes_home": "~/.hermes/sandbox",
   "is_sandbox": true,
   "is_readonly": false
 }
@@ -72,7 +72,7 @@ Base URL: `http://127.0.0.1:8766`
 {
   "type": "Skill",
   "name": "my-skill",
-  "source_path": "/Users/letitbe/.hermes/skills/my-skill/SKILL.md",
+  "source_path": "~/.hermes/skills/my-skill/SKILL.md",
   "state": "ACTIVE",
   "summary": "짧은 설명",
   "metadata": {
@@ -114,7 +114,7 @@ GET /api/read?path=%2FUsers%2Fletitbe%2F.hermes%2Fskills%2Fmy-skill%2FSKILL.md
 ```json
 {
   "content": "---\nname: my-skill\n...",
-  "path": "/Users/letitbe/.hermes/skills/my-skill/SKILL.md"
+  "path": "~/.hermes/skills/my-skill/SKILL.md"
 }
 ```
 
@@ -134,7 +134,7 @@ GET /api/read?path=%2FUsers%2Fletitbe%2F.hermes%2Fskills%2Fmy-skill%2FSKILL.md
 **Request body (JSON):**
 ```json
 {
-  "path": "/Users/letitbe/.hermes/skills/my-skill/SKILL.md",
+  "path": "~/.hermes/skills/my-skill/SKILL.md",
   "content": "---\nname: my-skill\n..."
 }
 ```
@@ -143,8 +143,8 @@ GET /api/read?path=%2FUsers%2Fletitbe%2F.hermes%2Fskills%2Fmy-skill%2FSKILL.md
 ```json
 {
   "status": "saved",
-  "path": "/Users/letitbe/.hermes/skills/my-skill/SKILL.md",
-  "backup": "/Users/letitbe/.hermes/skills/my-skill/SKILL.md.bak.20260524_153012"
+  "path": "~/.hermes/skills/my-skill/SKILL.md",
+  "backup": "~/.hermes/skills/my-skill/SKILL.md.bak.20260524_153012"
 }
 ```
 
@@ -165,7 +165,7 @@ GET /api/read?path=%2FUsers%2Fletitbe%2F.hermes%2Fskills%2Fmy-skill%2FSKILL.md
 **Request body (JSON):**
 ```json
 {
-  "path": "/Users/letitbe/.hermes/skills/my-skill/SKILL.md"
+  "path": "~/.hermes/skills/my-skill/SKILL.md"
 }
 ```
 
@@ -173,7 +173,7 @@ GET /api/read?path=%2FUsers%2Fletitbe%2F.hermes%2Fskills%2Fmy-skill%2FSKILL.md
 ```json
 {
   "status": "rolled_back",
-  "from_backup": "/Users/letitbe/.hermes/skills/my-skill/SKILL.md.bak.20260524_153012",
+  "from_backup": "~/.hermes/skills/my-skill/SKILL.md.bak.20260524_153012",
   "remaining_backups": 0
 }
 ```
@@ -407,7 +407,7 @@ URL에서 콘텐츠를 스크래핑합니다. Firecrawl → Jina → TLS → Bro
 **Request body (JSON):**
 ```json
 {
-  "path": "/Users/letitbe/.hermes/skills/my-skill/SKILL.md",
+  "path": "~/.hermes/skills/my-skill/SKILL.md",
   "commit_hash": "a1b2c3d"
 }
 ```
@@ -417,7 +417,7 @@ URL에서 콘텐츠를 스크래핑합니다. Firecrawl → Jina → TLS → Bro
 {
   "status": "restored",
   "to_commit": "a1b2c3d",
-  "backup": "/Users/letitbe/.hermes/skills/my-skill/SKILL.md.bak.20260524_153012"
+  "backup": "~/.hermes/skills/my-skill/SKILL.md.bak.20260524_153012"
 }
 ```
 
@@ -435,7 +435,7 @@ Git 연동 후 `/api/env` 응답에 필드가 추가됩니다:
 
 ```json
 {
-  "hermes_home": "/Users/letitbe/.hermes",
+  "hermes_home": "~/.hermes",
   "is_sandbox": false,
   "is_readonly": false,
   "is_git_repo": true,
@@ -459,7 +459,7 @@ Git 연동 후 `/api/save` 요청에 `commit_message` 필드 추가 가능:
 **Request body (JSON):**
 ```json
 {
-  "path": "/Users/letitbe/.hermes/skills/my-skill/SKILL.md",
+  "path": "~/.hermes/skills/my-skill/SKILL.md",
   "content": "---\nname: my-skill\n...",
   "commit_message": "feat: add python code review step"
 }
@@ -471,8 +471,8 @@ Git 연동 후 `/api/save` 요청에 `commit_message` 필드 추가 가능:
 ```json
 {
   "status": "saved",
-  "path": "/Users/letitbe/.hermes/skills/my-skill/SKILL.md",
-  "backup": "/Users/letitbe/.hermes/skills/my-skill/SKILL.md.bak.20260524_153012",
+  "path": "~/.hermes/skills/my-skill/SKILL.md",
+  "backup": "~/.hermes/skills/my-skill/SKILL.md.bak.20260524_153012",
   "git": {
     "committed": true,
     "hash": "a1b2c3d",

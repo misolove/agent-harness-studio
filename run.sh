@@ -3,7 +3,7 @@
 # Designed for macOS launchctl: RunAtLoad + KeepAlive
 set -e
 
-PROJECT_ROOT="/Users/letitbe/letitbe/agent-harness-studio"
+PROJECT_ROOT="~/agent-harness-studio"
 FRONTEND_DIR="$PROJECT_ROOT/src/ui"
 LOG_DIR="$HOME/Library/Logs/agent-harness-studio"
 
@@ -24,8 +24,8 @@ fi
 
 # ── Harness Target ─────────────────────────
 # 실데이터 (기본값) — ~/.hermes가 git repo이면 모든 변경이 커밋으로 기록됩니다.
-HARNESS_HOME="${HERMES_HOME:-/Users/letitbe/.hermes}"
-# 샌드박스로 전환: HERMES_HOME=/Users/letitbe/.hermes/sandbox ./run.sh
+HARNESS_HOME="${HERMES_HOME:-~/.hermes}"
+# 샌드박스로 전환: HERMES_HOME=~/.hermes/sandbox ./run.sh
 # 읽기 전용 모드: HARNESS_READONLY=1 ./run.sh
 
 # ── Clean up stale port occupants ──────────

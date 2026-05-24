@@ -18,7 +18,7 @@
 
 **실행 방법:**
 ```bash
-cd /Users/letitbe/letitbe/agent-harness-studio
+cd ~/agent-harness-studio
 source .venv/bin/activate
 # LaunchAgent로 자동 실행됨 (com.letitbe.agent-harness-studio)
 # 수동 실행: ./run.sh
@@ -53,7 +53,7 @@ source .venv/bin/activate
 ## 3. 완료된 작업 (이번 세션)
 
 ### 3.1 버그 수정
-- [x] **LaunchAgent HERMES_HOME 오류**: sandbox → `/Users/letitbe/.hermes` 수정, ThrottleInterval=10 추가
+- [x] **LaunchAgent HERMES_HOME 오류**: sandbox → `~/.hermes` 수정, ThrottleInterval=10 추가
 - [x] **run.sh 포트 정리**: 8766/5173 stale process kill 블록 추가
 - [x] **Config 카드 count=0**: frontend에서 items 배열 직접 카운트하도록 수정
 - [x] **카드 숫자 잘림/저대비**: `overflow:hidden` 제거, `.card-count` 스타일 개선 (흰 글자 + 보라 배경)
@@ -145,7 +145,7 @@ GET  /api/reference/hermes  → Molder에 주입되는 Hermes reference context
 
 ```bash
 # 스캐너 직접 실행
-cd /Users/letitbe/letitbe/agent-harness-studio
+cd ~/agent-harness-studio
 source .venv/bin/activate
 python -m src.scanner.hermes_scanner | python3 -c "
 import json, sys
@@ -165,8 +165,8 @@ open http://localhost:5173
 
 ## 7. 환경 정보
 
-- Python venv: `/Users/letitbe/letitbe/agent-harness-studio/.venv`
-- Node modules: `/Users/letitbe/letitbe/agent-harness-studio/src/ui/node_modules`
+- Python venv: `~/agent-harness-studio/.venv`
+- Node modules: `~/agent-harness-studio/src/ui/node_modules`
 - LaunchAgent logs: `~/Library/Logs/agent-harness-studio/stdout.log`
-- HERMES_HOME: `/Users/letitbe/.hermes`
+- HERMES_HOME: `~/.hermes`
 - Git repo: `~/.hermes` (모든 변경이 커밋으로 기록됨)

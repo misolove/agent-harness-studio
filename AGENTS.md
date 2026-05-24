@@ -69,7 +69,7 @@
 - **수정**: `/api/read` 엔드포인트 추가 + `handleEditClick`을 async fetch로 변경
 
 ### [MINOR] handleApply 하드코딩 경로
-- **증상**: `envInfo`가 로드되지 않은 상태에서 `/Users/letitbe/.hermes` 하드코딩 사용
+- **증상**: `envInfo`가 로드되지 않은 상태에서 `~/.hermes` 하드코딩 사용
 - **수정**: `envInfo?.hermes_home` 없을 때 에러 메시지 표시로 변경
 
 ### [MINOR] build_response config 카운팅
@@ -196,7 +196,7 @@ curl http://127.0.0.1:8766/api/env
 # 샌드박스에서 스킬 생성 테스트
 curl -X POST http://127.0.0.1:8766/api/save \
   -H "Content-Type: application/json" \
-  -d '{"path": "/Users/letitbe/.hermes/sandbox/skills/test-skill/SKILL.md", "content": "---\nname: test-skill\n---\n\nTest"}'
+  -d '{"path": "~/.hermes/sandbox/skills/test-skill/SKILL.md", "content": "---\nname: test-skill\n---\n\nTest"}'
 
 # 읽기 전용 모드 확인
 HARNESS_READONLY=1 curl -X POST http://127.0.0.1:8766/api/save \
