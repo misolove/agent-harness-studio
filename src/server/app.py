@@ -93,7 +93,8 @@ def build_response(items: List[Dict[str, Any]]) -> Dict[str, Any]:
         elif t == "Hook":
             summary["hooks"] = summary.get("hooks", 0) + 1
         else:
-            summary["config"] = summary.get("config", 0) + 1
+            summary["config"] = summary.get("memory", 0) + summary.get("context", 0) + summary.get("mcp", 0)
+    summary["web"] = 0 # Placeholder for Web Context count
 
     return {"summary": summary, "items": items, "total": len(items)}
 
@@ -268,7 +269,24 @@ def get_env():
     """Return current environment info for UI badge."""
     return {
         "hermes_home": str(HERMES_HOME),
-        "is_sandbox": "sandbox" in str(HERMES_HOME).lower()
+        "is_sandbox": HERMES_HOME.name == "sandbox"
+    }
+
+@app.post("/api/web/scrape")
+def web_scrape(url: str = Body(..., embed=True)):
+    """
+    Web Context Scraper Prototype. Integration with Firecrawl SDK will go here.
+    """
+    if not url:
+        return {"status": "error", "message": "URL is required"}
+    
+    # Mock response for prototype
+    return {
+        "status": "ok",
+        "url": url,
+        "title": f"Extracted: {url}",
+        "markdown": f"# Content from {url}\n\nThis is a placeholder for scraped content. Integration with Firecrawl is in progress.",
+        "metadata": {"source": "firecrawl-prototype"}
     }
 
 
