@@ -8,6 +8,10 @@ We believe that the design of an agent's **Harness** is more critical for practi
 
 ![Architecture Diagram](docs/assets/architecture.svg)
 
+### 📺 Demo Video
+
+Check out our [Intro Video](docs/assets/agent-harness-studio-intro.mp4) to see the studio in action.
+
 ---
 
 ## ✨ Key Features
