@@ -15,6 +15,7 @@ AI 에이전트의 하네스(메모리·스킬·훅·MCP·루트 컨텍스트)�
 ## 주요 기능
 - **Harness Inspector**: 분산된 설정 파일과 메모리를 한눈에 시각화
 - **Chat Molder**: 자연어 대화로 하네스 구성요소 즉시 수정 및 반영
+- **Web Context Harness (Beta)**: 웹 리서치 결과를 에이전트 컨텍스트로 정제 및 통합 (Firecrawl 연동)
 - **Live Validation**: 변경 사항에 대한 실시간 diff 및 영향도 분석
 - **Harness Preset**: 검증된 하네스 설정을 팀/커뮤니티와 공유
 

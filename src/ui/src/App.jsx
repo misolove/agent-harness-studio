@@ -55,6 +55,7 @@ function App() {
     { id: "mcp", title: "MCP", icon: "🔌" },
     { id: "context", title: "Context", icon: "📜" },
     { id: "config", title: "Config", icon: "⚙️" },
+    { id: "web", title: "Web Context", icon: "🌐" },
   ];
 
   const getFilteredItems = () => {
@@ -66,6 +67,7 @@ function App() {
       context: ["Root Context"],
       hooks: ["Hook"],
       config: ["Memory Config", "Root Context", "MCP Server"],
+      web: [], // Placeholder for Web Sources
     };
     const allowed = map[selectedSection] || [];
     return items.filter(i => allowed.includes(i.type));
@@ -218,6 +220,16 @@ function App() {
                 <button onClick={() => setSelectedSection(null)}>Close</button>
               </div>
               <div className="panel-content">
+                {selectedSection === "web" && (
+                  <div className="web-harness-placeholder">
+                    <p>Web Context Harness powered by <strong>Firecrawl</strong></p>
+                    <div className="web-input-mock">
+                       <input type="text" placeholder="Enter URL to index..." disabled />
+                       <button disabled>Index</button>
+                    </div>
+                    <p className="hint">This feature requires a Firecrawl API key. Integration is in progress.</p>
+                  </div>
+                )}
                 {getFilteredItems().map((item, idx) => (
                   <div key={idx} className="item-row">
                     <div className="item-main">

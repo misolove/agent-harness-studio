@@ -18,6 +18,7 @@ Check out our [Intro Video](docs/assets/agent-harness-studio-intro.mp4) to see t
 
 - **Harness Inspector**: Real-time visualization of distributed configs, memory stores, and skills.
 - **Chat Molder**: Modify harness components (like creating new skills) via natural language chat.
+- **Web Context Harness (Beta)**: Extract, clean, and integrate web sources as agent context (powered by Firecrawl).
 - **Sandbox Mode**: Safely test changes in a mirrored environment (`HERMES_HOME` isolation).
 - **Live Diff & Validation**: Review code changes with a high-fidelity diff viewer before applying.
 - **Port Management**: Optimized to run alongside tools like Agent Cat (Port 8766).
