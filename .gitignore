@@ -5,6 +5,10 @@ __pycache__/
 .env.*
 !.env.example
 .hermes-cache/
+harness_studio.db*
 dist/
 build/
 node_modules/
+.venv/
+.omc/
+state/

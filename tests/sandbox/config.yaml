@@ -459,6 +459,7 @@ command_allowlist:
 - script execution via -e/-c flag
 - kill hermes/gateway process (self-termination)
 - chmod +x followed by immediate execution
+- git force push short flag (rewrites remote history)
 - pipe remote content to shell
 - stop/restart hermes gateway (kills running agents)
 quick_commands: {}

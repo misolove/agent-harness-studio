@@ -1,72 +1,92 @@
 #!/usr/bin/env bash
-# Agent Harness Studio — Start Backend + Frontend
-# Backend port: 8766 ( avoids Agent Cat's 8765 )
+# Agent Harness Studio — Auto-start via LaunchAgent
+# Designed for macOS launchctl: RunAtLoad + KeepAlive
 set -e
 
-PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
-BACKEND_DIR="$PROJECT_ROOT/src/server"
+PROJECT_ROOT="/Users/letitbe/letitbe/agent-harness-studio"
 FRONTEND_DIR="$PROJECT_ROOT/src/ui"
+LOG_DIR="$HOME/Library/Logs/agent-harness-studio"
 
-echo "╔══════════════════════════════════════════╗"
-echo "║   Agent Harness Studio — Starting...    ║"
-echo "╚══════════════════════════════════════════╝"
+mkdir -p "$LOG_DIR"
 
-# Check dependencies
-if ! command -v python3 &>/dev/null; then
-  echo "ERROR: python3 not found"
-  exit 1
-fi
+echo "[$(date)] ╔══════════════════════════════════════════╗"
+echo "[$(date)] ║   Agent Harness Studio — Starting...    ║"
+echo "[$(date)] ╚══════════════════════════════════════════╝"
 
-if ! command -v node &>/dev/null; then
-  echo "ERROR: node not found"
-  exit 1
-fi
-
-# Create/use local virtualenv for Python deps
-if [ ! -d "$PROJECT_ROOT/.venv" ]; then
-  echo "📦 Creating Python virtualenv..."
-  python3 -m venv "$PROJECT_ROOT/.venv"
-fi
+# Activate virtualenv
 source "$PROJECT_ROOT/.venv/bin/activate"
 
-# Install Python deps if needed
-if ! python -c "import fastapi, firecrawl, dotenv" 2>/dev/null; then
-  echo "📦 Installing Python dependencies..."
-  pip install -r "$PROJECT_ROOT/requirements.txt"
-fi
-
-# Install Node deps if needed
+# Ensure Node deps
 if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
-  echo "📦 Installing Node dependencies..."
+  echo "[$(date)] 📦 Installing Node dependencies..."
   cd "$FRONTEND_DIR" && npm install
 fi
 
-cleanup() {
-  echo ""
-  echo "🛑 Shutting down..."
-  kill $BACKEND_PID $FRONTEND_PID 2>/dev/null
-  exit 0
-}
-trap cleanup SIGINT SIGTERM
+# ── Harness Target ─────────────────────────
+# 실데이터 (기본값) — ~/.hermes가 git repo이면 모든 변경이 커밋으로 기록됩니다.
+HARNESS_HOME="${HERMES_HOME:-/Users/letitbe/.hermes}"
+# 샌드박스로 전환: HERMES_HOME=/Users/letitbe/.hermes/sandbox ./run.sh
+# 읽기 전용 모드: HARNESS_READONLY=1 ./run.sh
 
-# Start Backend
-echo "🚀 Starting Backend on http://127.0.0.1:8766"
+# ── Clean up stale port occupants ──────────
+for PORT in 8766 5173; do
+  OLD_PID=$(lsof -ti tcp:$PORT 2>/dev/null || true)
+  if [ -n "$OLD_PID" ]; then
+    echo "[$(date)] 🧹 Killing stale process on port $PORT (PID $OLD_PID)"
+    kill $OLD_PID 2>/dev/null || true
+    sleep 1
+  fi
+done
+
+# ── Start Backend ──────────────────────────
+echo "[$(date)] 🚀 Starting Backend on http://127.0.0.1:8766 (HERMES_HOME=$HARNESS_HOME)"
 cd "$PROJECT_ROOT"
-python "$BACKEND_DIR/app.py" &
+HERMES_HOME="$HARNESS_HOME" \
+HARNESS_READONLY="${HARNESS_READONLY:-0}" \
+  python -m uvicorn src.server.app:app \
+    --host 127.0.0.1 \
+    --port 8766 \
+    --log-level info &
 BACKEND_PID=$!
 
-# Start Frontend
-echo "🚀 Starting Frontend on http://localhost:5173"
+# ── Start Frontend ─────────────────────────
+echo "[$(date)] 🚀 Starting Frontend on http://localhost:5173"
 cd "$FRONTEND_DIR"
 npx vite --host localhost --port 5173 &
 FRONTEND_PID=$!
 
-echo ""
-echo "✅ Agent Harness Studio is running!"
-echo "   Frontend: http://localhost:5173"
-echo "   Backend:  http://127.0.0.1:8766"
-echo "   API Docs: http://127.0.0.1:8766/docs"
-echo ""
-echo "Press Ctrl+C to stop."
+# ── Health Check (after brief wait) ────────
+sleep 6
+HEALTH_OK=true
 
-wait
+if curl -sf http://127.0.0.1:8766/docs -o /dev/null 2>/dev/null; then
+  echo "[$(date)] ✅ Backend healthy"
+else
+  echo "[$(date)] ⚠️  Backend not responding yet"
+  HEALTH_OK=false
+fi
+
+if curl -sf http://localhost:5173 -o /dev/null 2>/dev/null; then
+  echo "[$(date)] ✅ Frontend healthy"
+else
+  echo "[$(date)] ⚠️  Frontend not responding yet"
+  HEALTH_OK=false
+fi
+
+echo "[$(date)] PIDs: Backend=$BACKEND_PID Frontend=$FRONTEND_PID"
+
+# ── Wait for any child to exit ─────────────
+# When one dies, kill the other so KeepAlive restarts the whole stack cleanly.
+while kill -0 $BACKEND_PID 2>/dev/null && kill -0 $FRONTEND_PID 2>/dev/null; do
+  sleep 5
+done
+
+DEAD=""
+kill -0 $BACKEND_PID 2>/dev/null || DEAD="backend"
+kill -0 $FRONTEND_PID 2>/dev/null || DEAD="frontend"
+
+echo "[$(date)] 🛑 $DEAD exited. Killing remaining processes..."
+kill $BACKEND_PID $FRONTEND_PID 2>/dev/null || true
+wait 2>/dev/null || true
+echo "[$(date)] Stack shut down. KeepAlive will restart."
+exit 1
