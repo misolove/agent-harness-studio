@@ -1,7 +1,10 @@
 #!/bin/bash
 
 # Agent Harness Studio - Sandbox Testing Script
-# This script runs the app in a isolated environment to prevent actual data modification.
+# Runs the app in an isolated fake HERMES_HOME so real ~/.hermes is never modified.
+# Backend port: 8766 (8765 is reserved by Agent Cat local connector)
+
+set -e
 
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 SANDBOX_DIR="$PROJECT_ROOT/tests/sandbox"
@@ -40,10 +43,11 @@ EOF
 echo ""
 echo "=== 🚀 Launching Studio in SANDBOX MODE ==="
 echo "Targeting: $SANDBOX_DIR"
+echo "Backend: http://127.0.0.1:8766"
+echo "Frontend: http://localhost:5173"
 echo "Note: Any changes made in the UI will happen in the sandbox directory."
 echo ""
 
-# Run backend and frontend (background)
 export HERMES_HOME="$SANDBOX_DIR"
 
 # Source venv if exists
@@ -56,13 +60,13 @@ python3 "$PROJECT_ROOT/src/server/app.py" &
 BACKEND_PID=$!
 
 # Start Frontend
-cd "$PROJECT_ROOT/src/ui" && npm run dev &
+cd "$PROJECT_ROOT/src/ui" && npx vite --host localhost --port 5173 &
 FRONTEND_PID=$!
 
 echo "Dashboard running at http://localhost:5173"
 echo "Press Ctrl+C to stop and cleanup."
 
 # Cleanup on exit
-trap "kill $BACKEND_PID $FRONTEND_PID; echo 'Exiting...'" SIGINT SIGTERM
+trap "kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; echo 'Exiting...'" SIGINT SIGTERM
 
 wait

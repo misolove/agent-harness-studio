@@ -263,6 +263,14 @@ def save_item(path: str = Body(...), content: str = Body(...)):
 def health():
     return {"status": "ok"}
 
+@app.get("/api/env")
+def get_env():
+    """Return current environment info for UI badge."""
+    return {
+        "hermes_home": str(HERMES_HOME),
+        "is_sandbox": "sandbox" in str(HERMES_HOME).lower()
+    }
+
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="127.0.0.1", port=8765, reload=True)
+    uvicorn.run("app:app", host="127.0.0.1", port=8766, reload=True)

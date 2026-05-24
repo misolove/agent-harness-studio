@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Agent Harness Studio — Start Backend + Frontend
+# Backend port: 8766 ( avoids Agent Cat's 8765 )
 set -e
 
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -42,7 +43,7 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Start Backend
-echo "🚀 Starting Backend on http://127.0.0.1:8765"
+echo "🚀 Starting Backend on http://127.0.0.1:8766"
 cd "$PROJECT_ROOT"
 python3 "$BACKEND_DIR/app.py" &
 BACKEND_PID=$!
@@ -56,8 +57,8 @@ FRONTEND_PID=$!
 echo ""
 echo "✅ Agent Harness Studio is running!"
 echo "   Frontend: http://localhost:5173"
-echo "   Backend:  http://127.0.0.1:8765"
-echo "   API Docs: http://127.0.0.1:8765/docs"
+echo "   Backend:  http://127.0.0.1:8766"
+echo "   API Docs: http://127.0.0.1:8766/docs"
 echo ""
 echo "Press Ctrl+C to stop."
 

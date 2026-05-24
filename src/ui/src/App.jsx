@@ -1,16 +1,32 @@
 import { useState, useEffect } from "react";
 import "./App.css";
 
-// Basic styling matches the "Agent Harness" vibe (dark theme, deep purples/blues)
 function App() {
   const [summary, setSummary] = useState(null);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedSection, setSelectedSection] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
+  const [editContent, setEditContent] = useState("");
+  const [saveStatus, setSaveStatus] = useState("");
 
-  useEffect(() => {
-    fetch("http://127.0.0.1:8765/api/scan")
+  const [prompt, setPrompt] = useState("");
+  const [molderResponse, setMolderResponse] = useState(null);
+  const [envInfo, setEnvInfo] = useState(null);
+
+  const API_BASE = "http://127.0.0.1:8766";
+
+  const fetchEnv = () => {
+    fetch(`${API_BASE}/api/env`)
+      .then((res) => res.json())
+      .then((data) => setEnvInfo(data))
+      .catch((err) => console.error("Failed to fetch env info", err));
+  };
+
+  const fetchHarness = () => {
+    setLoading(true);
+    fetch(`${API_BASE}/api/scan`)
       .then((res) => {
         if (!res.ok) throw new Error("API error: " + res.status);
         return res.json();
@@ -25,6 +41,11 @@ function App() {
         setError(err.message);
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchEnv();
+    fetchHarness();
   }, []);
 
   const sections = [
@@ -38,9 +59,6 @@ function App() {
 
   const getFilteredItems = () => {
     if (!selectedSection) return [];
-    
-    // In a real app we'd fetch from /api/scan/{section} or filter client-side better.
-    // For prototype, client-side filter is fine.
     const map = {
       skills: ["Skill"],
       memory: ["Memory Config", "Memory Manifest", "Memory Directory", "Memory State"],
@@ -49,16 +67,104 @@ function App() {
       hooks: ["Hook"],
       config: ["Memory Config", "Root Context", "MCP Server"],
     };
-    
     const allowed = map[selectedSection] || [];
     return items.filter(i => allowed.includes(i.type));
+  };
+
+  const handleEditClick = (item) => {
+    setEditingItem(item);
+    // In a real app we would GET the file content.
+    // For this prototype, we just mock the initial content based on metadata.
+    setEditContent(`---\nname: ${item.name}\ndescription: ${item.summary}\n---\n\n# Details\nEditing ${item.source_path}`);
+    setSaveStatus("");
+  };
+
+  const handleSave = () => {
+    setSaveStatus("Saving...");
+    fetch(`${API_BASE}/api/save`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: editingItem.source_path, content: editContent })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setSaveStatus("Saved successfully!");
+        setTimeout(() => {
+          setEditingItem(null);
+          fetchHarness();
+        }, 1000);
+      })
+      .catch(err => {
+        console.error(err);
+        setSaveStatus("Error saving.");
+      });
+  };
+
+  const handleMold = () => {
+    if (!prompt.trim()) return;
+    setMolderResponse({ status: "loading" });
+    fetch(`${API_BASE}/api/mold`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setMolderResponse(data);
+        setPrompt("");
+      })
+      .catch(err => {
+        setMolderResponse({ status: "error", message: err.message });
+      });
+  };
+
+  const handleApply = () => {
+    if (!molderResponse || !molderResponse.content) return;
+    
+    // Determine path based on action
+    const home = envInfo?.hermes_home || "/Users/letitbe/.hermes";
+    let path = "";
+    if (molderResponse.action.includes("SKILL")) {
+      path = `${home}/skills/${molderResponse.name}/SKILL.md`;
+    } else {
+      path = `${home}/temp_proposal.md`;
+    }
+
+    setSaveStatus("Applying...");
+    fetch(`${API_BASE}/api/save`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: path, content: molderResponse.content })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setSaveStatus("Applied successfully!");
+        setMolderResponse(null);
+        fetchHarness();
+      })
+      .catch(err => {
+        console.error(err);
+        setSaveStatus("Error applying.");
+      });
   };
 
   return (
     <div className="app-container">
       <header className="app-header">
-        <h1>Agent Harness Studio</h1>
-        <p className="subtitle">Hermes Local Workspace</p>
+        <div className="header-left">
+          <h1>Agent Harness Studio</h1>
+          <p className="subtitle">Hermes Local Workspace</p>
+        </div>
+        {envInfo && (
+          <div className="header-right">
+            <span className={`env-badge ${envInfo.is_sandbox ? 'sandbox' : 'real'}`}>
+              {envInfo.is_sandbox ? '🛠️ SANDBOX MODE' : '⚠️ REAL HERMES MODE'}
+            </span>
+            <span className="env-path" title={envInfo.hermes_home}>
+              {envInfo.hermes_home.length > 30 ? '...' + envInfo.hermes_home.slice(-30) : envInfo.hermes_home}
+            </span>
+          </div>
+        )}
       </header>
 
       {error && <div className="error-banner">Connection Error: {error}</div>}
@@ -69,14 +175,12 @@ function App() {
           <div className="cards-grid">
             {sections.map((sec) => {
               const count = summary?.[sec.id] || 0;
-              // Determine status simply based on count for prototype
               const statusClass = count > 0 ? "status-ok" : "status-warn";
-              
               return (
                 <div 
                   key={sec.id} 
                   className={`card ${selectedSection === sec.id ? "active" : ""}`}
-                  onClick={() => setSelectedSection(sec.id)}
+                  onClick={() => { setSelectedSection(sec.id); setEditingItem(null); }}
                 >
                   <div className="card-header">
                     <span className="icon">{sec.icon}</span>
@@ -94,7 +198,7 @@ function App() {
             })}
           </div>
 
-          {selectedSection && (
+          {selectedSection && !editingItem && (
             <div className="detail-panel">
               <div className="panel-header">
                 <h3>{sections.find(s => s.id === selectedSection)?.title} Details</h3>
@@ -111,6 +215,9 @@ function App() {
                     <div className={`item-state state-${item.state.toLowerCase()}`}>
                       {item.state}
                     </div>
+                    {item.type === "Skill" && (
+                       <button className="edit-btn" onClick={() => handleEditClick(item)}>Edit</button>
+                    )}
                   </div>
                 ))}
                 {getFilteredItems().length === 0 && (
@@ -119,19 +226,59 @@ function App() {
               </div>
             </div>
           )}
+
+          {editingItem && (
+            <div className="editor-panel">
+               <div className="panel-header">
+                <h3>Editing: {editingItem.name}</h3>
+                <div>
+                   <span className="save-status">{saveStatus}</span>
+                   <button onClick={handleSave} className="save-btn">Save</button>
+                   <button onClick={() => setEditingItem(null)}>Cancel</button>
+                </div>
+              </div>
+              <textarea 
+                className="code-editor"
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+              />
+            </div>
+          )}
+
+          {/* Molder Output Preview */}
+          {molderResponse && (
+            <div className="molder-preview">
+              <div className="panel-header">
+                <h3>Chat Molder Proposal</h3>
+                <button onClick={() => setMolderResponse(null)}>Dismiss</button>
+              </div>
+              {molderResponse.status === "loading" ? (
+                <p>Molding harness...</p>
+              ) : (
+                <div>
+                  <p><strong>Action:</strong> {molderResponse.action} ({molderResponse.name})</p>
+                  <p>{molderResponse.message}</p>
+                  <pre className="diff-viewer">{molderResponse.diff}</pre>
+                  <button className="apply-btn" onClick={handleApply}>Apply Changes</button>
+                </div>
+              )}
+            </div>
+          )}
         </main>
       )}
 
-      {/* Chat Molder UI (Mock) */}
+      {/* Chat Molder UI */}
       <footer className="chat-molder">
         <div className="chat-input-wrapper">
           <span className="chat-icon">✨</span>
           <input 
             type="text" 
             placeholder="Describe an agent skill or memory to generate..." 
-            disabled 
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleMold()}
           />
-          <button disabled>Generate</button>
+          <button onClick={handleMold}>Mold</button>
         </div>
       </footer>
     </div>
