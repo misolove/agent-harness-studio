@@ -1,0 +1,10 @@
+.DS_Store
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+.hermes-cache/
+dist/
+build/
+node_modules/
