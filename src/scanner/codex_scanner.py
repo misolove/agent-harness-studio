@@ -1,6 +1,4 @@
 import json
-import yaml
-from pathlib import Path
 from typing import Dict, List, Any
 from .base_scanner import BaseHarnessScanner
 
@@ -46,7 +44,7 @@ class CodexScanner(BaseHarnessScanner):
             skills_dir = self.workspace_dir / skill_dir_name
             if skills_dir.exists():
                 for item in skills_dir.iterdir():
-                    if item.is_file() and item.suffix == ".md":
+                    if item.is_file() and item.suffix in {".md", ".rules", ".txt", ".toml"}:
                         results.append({
                             "type": "Skill",
                             "name": item.stem,
@@ -99,6 +97,20 @@ class CodexScanner(BaseHarnessScanner):
                 }
             })
 
+        sqlite_dir = self.workspace_dir / "sqlite"
+        if sqlite_dir.exists():
+            for state_file in sqlite_dir.glob("*.db"):
+                results.append({
+                    "type": "Memory State",
+                    "name": state_file.name,
+                    "source_path": str(state_file),
+                    "state": "ACTIVE",
+                    "summary": "Codex SQLite database",
+                    "metadata": {
+                        "size_bytes": state_file.stat().st_size
+                    }
+                })
+
         for state_name in ["history.jsonl", "models_cache.json", ".codex-global-state.json", "session_index.jsonl"]:
             state_file = self.workspace_dir / state_name
             if state_file.exists():
@@ -146,7 +158,7 @@ class CodexScanner(BaseHarnessScanner):
                     "source_path": str(agent_file),
                     "state": "ACTIVE",
                     "summary": "Codex agent",
-                    "metadata": {}
+                    "metadata": {"on_demand": True}
                 })
 
         # 7. Plugins
@@ -162,7 +174,4 @@ class CodexScanner(BaseHarnessScanner):
                     "metadata": {}
                 })
 
-        for item in results:
-            item["token_estimate"] = self._estimate_tokens_for_item(item)
-
-        return results
+        return self._finalize_items(results)

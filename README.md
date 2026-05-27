@@ -1,6 +1,6 @@
 # Agent Harness Studio
 
-AI 에이전트의 하네스(스킬, 메모리, MCP, 훅, 크론, 플러그인, 루트 컨텍스트)를 **시각화·관리·수정**하는 오픈소스 로컬 웹 대시보드입니다. 자연어 대화로 하네스 구성요소를 생성하고 수정할 수 있습니다.
+AI 에이전트의 하네스(스킬, 메모리, MCP, 훅, 크론, 플러그인, 루트 컨텍스트)를 **시각화·관리·수정**하는 오픈소스 로컬 웹 대시보드입니다. Hermes뿐 아니라 Claude Code, Cursor, Codex, OpenClaw, Gemini/Antigravity, Studio 자체 워크스페이스를 스캔하고, 자연어 대화·사용량 분석·스킬 변환으로 하네스를 정리/재사용할 수 있습니다.
 
 ## 핵심 철학: Harness over Model
 
@@ -17,7 +17,7 @@ AI 에이전트의 하네스(스킬, 메모리, MCP, 훅, 크론, 플러그인, 
 ## 주요 기능
 
 ### 하네스 스캐너 (Harness Scanner)
-`~/.hermes` 디렉토리를 순회하며 모든 하네스 구성요소를 탐지합니다:
+여러 로컬 에이전트 워크스페이스를 순회하며 하네스 구성요소를 탐지합니다:
 - **스킬 (Skills)** — `skills/**/SKILL.md` YAML frontmatter 파싱, 외부 디렉토리, 비활성 상태 반영
 - **스킬 번들 (Skill Bundles)** — `skill-bundles/*.yaml` 워크플로우 팩
 - **MCP 서버** — `config.yaml` mcp_servers (stdio + HTTP, transport/auth/tools 메타데이터 포함)
@@ -26,10 +26,14 @@ AI 에이전트의 하네스(스킬, 메모리, MCP, 훅, 크론, 플러그인, 
 - **크론 작업 (Cron Jobs)** — `cron/jobs.json` 상태 추적
 - **플러그인 (Plugins)** — `plugins/*/plugin.yaml` tools/hooks 수 표시
 - **루트 컨텍스트 (Root Context)** — AGENTS.md, SOUL.md, system_prompt
+- **로그/세션/State DB/체크포인트** — 큰 로그 tail 읽기, sessions/state.db 요약, checkpoint inventory
+
+지원 워크스페이스:
+`~/.hermes`, `~/.claude`, `~/.cursor`, `~/.codex`, `~/.openclaw`, `~/.gemini`, `~/.gemini/antigravity`, 이 프로젝트(`agent-harness-studio`) 자체.
 
 ### 섹션 대시보드 (Section Dashboard)
-전체 하네스를 한눈에 볼 수 있는 11개 섹션 카드:
-Skills, Skill Bundles, MCP, Hooks, Memory Map, Cron, Plugins, Context, Config, Audit Log, Web Context.
+전체 하네스를 한눈에 볼 수 있는 섹션 카드:
+Skills, Skill Bundles/Subagents, MCP, Hooks, Memory Map, Cron, Plugins/Commands, Context, Config, Logs, Sessions, State DB, Checkpoints, Agent Runner, Diff Audit, Audit Log, Web Context.
 
 ### 2단 레이아웃 (2-Column Layout)
 - **좌측 패널 (55%)**: 섹션 카드 + 카테고리 상세 + 파일 에디터
@@ -43,6 +47,35 @@ Skills, Skill Bundles, MCP, Hooks, Memory Map, Cron, Plugins, Context, Config, A
 - **멀티턴 대화**: 컨텍스트 인식 응답을 위한 대화 히스토리 유지
 - **컨텍스트 인식**: 대시보드에서 선택한 섹션/아이템을 인식
 - **Hermes 기준 주입**: 모든 LLM 호출에 `nousresearch/hermes-agent` 정식 기준 컨텍스트 포함
+- **Pi Agent 모드**: 설치된 `pi` CLI를 이용해 read/grep/find/ls/web_search 기반 read-only 대화를 실행하고 세션을 이어갑니다.
+
+### Usage Telemetry + Smart Diet
+Claude Code 세션 로그(`~/.claude/projects/**/*.jsonl`)를 파싱해 Skill/Subagent 사용 빈도를 계산합니다.
+
+- `/api/usage/stats` — Skill/Subagent invocation 통계
+- `/api/recommendations` — 사용량 + 토큰 + 수정시각 기반 추천
+- Diet 모달의 **Smart** 탭 — `HIGH_VALUE`, `STALE_UNUSED`, `ARCHIVE`, `HEAVY_UNUSED` 배지
+- 추천 항목에서 아카이브/복사/Hermes 주입 액션 실행
+
+현재 Claude Code 워크스페이스 기준 검증값: 추천 263개, `HIGH_VALUE:1`, `STALE_UNUSED:72`, `ARCHIVE:190`.
+
+### Cross-Agent Skill Converter
+Claude Code Skill을 Hermes Skill로 변환/주입합니다.
+
+- 에디터 내 frontmatter 변환: Hermes ↔ Claude Code
+- Claude Skills 목록의 **To Hermes** 버튼
+- Skill editor의 **Inject to Hermes** 버튼
+- Smart 추천 액션 컬럼의 Hermes 주입 버튼
+- `/api/convert/skill/inject` — `dry_run`, overwrite 충돌 방지, companion directory 복사, audit log
+
+### Agent Runner — Pi Coding Agent
+설치된 Pi Coding Agent CLI를 Studio 안에서 감지하고 read-only로 실행합니다.
+
+- `/api/agent-runners`, `/api/pi/status` — Pi CLI/provider/model/session 감지
+- `/api/pi/preview` — 실행 전 command preview
+- `/api/pi/runs` — read-only run 시작 (`read,grep,find,ls`)
+- `/api/pi/runs/{id}`, `/log`, `/stop` — 상태/로그/중지
+- Chat Molder Pi 모드 — `read,grep,find,ls,web_search`로 대화형 실행
 
 ### 하이브리드 웹 스크래퍼 (Hybrid Web Scraper)
 웹 콘텐츠를 Markdown으로 추출하는 4단계 폴백 파이프라인:
@@ -80,6 +113,11 @@ Skills, Skill Bundles, MCP, Hooks, Memory Map, Cron, Plugins, Context, Config, A
 - **SOUL.md 에디터**: 3개 내장 프리셋(Developer, Researcher, Writer)으로 페르소나 편집
 - **컨텍스트 윈도우 추정기**: 하네스 아이템별 토큰 카운팅, 128K 예산 표시
 - **크로스 에이전트 스킬 변환기**: Hermes ↔ Claude Code 형식 간 스킬 변환
+- **Claude → Hermes Skill 주입**: 선택한 Claude Skill을 `~/.hermes/skills/{name}/SKILL.md`로 변환 저장
+- **Smart Diet**: 사용량 기반 보존/정리/아카이브 추천
+- **Diff Audit**: workspace git status/stat 기반 변경 위험도 점검
+- **Agent Runner**: Pi Coding Agent 감지, read-only 실행, 로그/감사 표시
+- **Sessions/State DB 뷰어**: state.db 세션/테이블 요약과 최근 세션 메시지 확인
 - **SQLite 감사 로그**: 모든 저장/롤백/초기화 작업의 변경 이력 추적
 - **Chat 내 마크다운 렌더링**: Chat Molder에서 제목, 목록, 표, 인라인 서식 올바르게 표시
 - **LaunchAgent**: macOS `launchctl` 자동 시작 + KeepAlive + 헬스 모니터링
@@ -92,9 +130,9 @@ Skills, Skill Bundles, MCP, Hooks, Memory Map, Cron, Plugins, Context, Config, A
 |---------|------|------|
 | 백엔드 | FastAPI (Python 3.13+) + uvicorn | 8766 |
 | 프론트엔드 | React + Vite | 5173 |
-| 스캐너 | 커스텀 HermesScanner | — |
+| 스캐너 | Hermes/Claude/Cursor/Codex/OpenClaw/Gemini/Antigravity/Studio scanners | — |
 | LLM | 9router 로컬 프록시 (`model: letitbe`) → OpenAI API 폴백 | 20128 |
-| 데이터 소스 | `~/.hermes` 디렉토리 | — |
+| 데이터 소스 | `~/.hermes`, `~/.claude`, `~/.cursor`, `~/.codex`, `~/.openclaw`, `~/.gemini`, Studio repo | — |
 
 ---
 
@@ -115,8 +153,8 @@ Skills, Skill Bundles, MCP, Hooks, Memory Map, Cron, Plugins, Context, Config, A
 ┌─────────────────────────────────────────────────────────────────┐
 │                    FastAPI 백엔드 (localhost:8766)                │
 │                                                                 │
-│  GET  /api/scan          → HermesScanner.scan_all()            │
-│  GET  /api/scan/{section}→ HermesScanner + 타입 필터           │
+│  GET  /api/scan          → workspace별 scanner.scan_all()      │
+│  GET  /api/scan/{section}→ scanner + 타입 필터                 │
 │  GET  /api/read          → Path.read_text()                    │
 │  POST /api/save          → 백업 + 쓰기 + git 커밋              │
 │  POST /api/rollback      → .bak.* 복원                         │
@@ -129,6 +167,11 @@ Skills, Skill Bundles, MCP, Hooks, Memory Map, Cron, Plugins, Context, Config, A
 │  POST /api/git/rollback  → 파일별 git 복원                     │
 │  GET  /api/audit/logs    → SQLite 감사 추적                    │
 │  POST /api/convert/skill → Hermes ↔ Claude Code 변환           │
+│  POST /api/convert/skill/inject → Claude Skill → Hermes 주입    │
+│  GET  /api/usage/stats   → Claude Skill/Subagent 사용량         │
+│  GET  /api/recommendations → Smart Diet 추천                   │
+│  GET  /api/agent-runners → Pi Agent Runner 감지                 │
+│  POST /api/pi/runs       → Pi read-only run                     │
 └──────────┬──────────────────────────────────────┬──────────────┘
            │                                      │
            ▼                                      ▼
@@ -230,18 +273,26 @@ cd src/ui && npx vite
 |--------|-----------|------|
 | `GET` | `/health` | 헬스체크 |
 | `GET` | `/api/env` | 환경 정보 (home, sandbox, readonly, git 상태) |
+| `GET` | `/api/workspaces` | 지원 워크스페이스 목록 |
 | `GET` | `/api/scan` | 전체 하네스 스캔 + 요약 카운트 |
 | `GET` | `/api/scan/{section}` | 섹션별 필터링 스캔 |
-| `GET` | `/api/read?path=...` | 파일 내용 읽기 (HERMES_HOME 내부만) |
+| `GET` | `/api/read?path=...` | 허용된 agent workspace 파일 내용 읽기 |
 | `POST` | `/api/save` | 파일 저장 + 자동 백업 + git 커밋 |
 | `POST` | `/api/rollback` | 최근 `.bak.*` 백업으로 복원 |
 | `GET` | `/api/reference/hermes` | 정식 Hermes 기준 컨텍스트 |
+| `GET` | `/api/usage/stats` | Claude Code Skill/Subagent 사용량 |
+| `GET` | `/api/recommendations` | Smart Diet 추천 |
+| `POST` | `/api/actions/archive` | 파일/디렉토리 아카이브 이동 |
+| `POST` | `/api/actions/copy` | 다른 워크스페이스로 복사 |
 
 ### Chat Molder
 
 | 메서드 | 엔드포인트 | 설명 |
 |--------|-----------|------|
 | `POST` | `/api/mold` | 대화형 AI — CHAT, CREATE_SKILL, UPDATE_SKILL, SUGGESTION 모드 |
+| `POST` | `/api/pi/mold` | Pi Agent 기반 Chat Molder run 시작 |
+| `GET` | `/api/pi/runs/{id}` | Pi run 상태 조회 |
+| `GET` | `/api/pi/runs/{id}/log` | Pi run 로그 tail |
 
 ### Git 연동
 
@@ -251,6 +302,19 @@ cd src/ui && npx vite
 | `GET` | `/api/git/log?path=...&limit=...` | 커밋 이력 (파일 필터 옵션) |
 | `GET` | `/api/git/diff?commit_hash=...` | 특정 커밋의 변경 내용 |
 | `POST` | `/api/git/rollback` | 특정 커밋으로 파일 복원 |
+| `GET` | `/api/git/audit` | 현재 워크스페이스 diff audit |
+
+### Agent Runner / Pi
+
+| 메서드 | 엔드포인트 | 설명 |
+|--------|-----------|------|
+| `GET` | `/api/agent-runners` | 로컬 agent runtime 목록 |
+| `GET` | `/api/pi/status` | Pi CLI/config/provider/model 상태 |
+| `POST` | `/api/pi/preview` | Pi command preview (실행 없음) |
+| `POST` | `/api/pi/runs` | Pi read-only run 시작 |
+| `GET` | `/api/pi/runs/{id}` | run 상태 |
+| `GET` | `/api/pi/runs/{id}/log` | stdout/stderr tail |
+| `POST` | `/api/pi/runs/{id}/stop` | run 중지 |
 
 ### 기타
 
@@ -259,6 +323,9 @@ cd src/ui && npx vite
 | `POST` | `/api/web/scrape` | 하이브리드 4단계 웹 콘텐츠 추출 |
 | `GET` | `/api/audit/logs` | SQLite 감사 추적 |
 | `POST` | `/api/convert/skill` | Hermes ↔ Claude Code 스킬 변환 |
+| `POST` | `/api/convert/skill/inject` | Claude Skill을 Hermes Skill로 변환/주입 |
+| `GET` | `/api/sessions/list` | state.db 세션 목록 |
+| `GET` | `/api/sessions/messages` | 특정 세션 메시지 |
 
 > 전체 API 문서: [docs/api.md](docs/api.md)
 
@@ -270,9 +337,19 @@ cd src/ui && npx vite
 agent-harness-studio/
 ├── src/
 │   ├── scanner/
-│   │   └── hermes_scanner.py        # 핵심: ~/.hermes 스캔 엔진
+│   │   ├── base_scanner.py          # 공통 scanner base
+│   │   ├── hermes_scanner.py        # ~/.hermes 상세 스캔 엔진
+│   │   ├── claude_scanner.py        # ~/.claude
+│   │   ├── codex_scanner.py         # ~/.codex
+│   │   ├── cursor_scanner.py        # ~/.cursor
+│   │   ├── openclaw_scanner.py      # ~/.openclaw
+│   │   ├── gemini_cli_scanner.py    # ~/.gemini
+│   │   ├── antigravity_scanner.py   # ~/.gemini/antigravity
+│   │   └── studio_scanner.py        # agent-harness-studio 자체
 │   ├── server/
 │   │   ├── app.py                   # FastAPI 메인 앱 (모든 엔드포인트)
+│   │   ├── usage_tracker.py         # Claude/Codex 사용량 파서
+│   │   ├── recommender.py           # Smart Diet 추천 엔진
 │   │   └── scrapers/                # 하이브리드 웹 스크래퍼 파이프라인
 │   │       ├── hybrid.py            # 4단계 오케스트레이터
 │   │       ├── firecrawl_scraper.py
@@ -286,6 +363,9 @@ agent-harness-studio/
 │           └── ScrapingPipeline.jsx # 웹 스크래핑 결과 표시
 ├── docs/
 │   ├── api.md                       # API 레퍼런스
+│   ├── agent-runner-pi.md           # Pi Agent Runner 설계/구현 상태
+│   ├── product-assessment-and-skill-converter.md # 제품성 평가 + Skill Converter API
+│   ├── usage-telemetry-spec.md      # Usage Telemetry A안 구현 스펙
 │   ├── prd.md                       # 제품 요구사항
 │   ├── git-safety.md                # Git 안전 가이드
 │   ├── firecrawl-vs-insane-search.md # 스크래퍼 비교
@@ -348,7 +428,7 @@ OPENAI_API_KEY=sk-...
 
 ## 스크린샷
 
-> 스크린샷 준비 중. UI는 다크 테마 기반 2단 레이아웃으로, 좌측에 섹션 대시보드, 우측에 Chat Molder가 배치됩니다.
+> 현재 UI는 다크 테마 기반 대시보드입니다. 좌측/상단에서 workspace와 섹션을 고르고, 중앙에서 목록·검색·정렬·편집·Smart Diet·Agent Runner를 다루며, 우측 Chat Molder는 LLM 모드와 Pi Agent 모드를 전환할 수 있습니다.
 
 ---
 
@@ -356,7 +436,8 @@ OPENAI_API_KEY=sk-...
 
 기여를 환영합니다! 관심 분야:
 
-- 멀티 에이전트 지원 (Claude Code, Codex 등)
+- 신규 에이전트 스캐너/runner adapter 추가
+- Claude → Hermes 외 추가 skill 변환 경로
 - WebSocket/SSE 기반 실시간 파일 감시
 - 훅/MCP 활성화 토글 UI
 - 하네스 프리셋 갤러리
@@ -374,6 +455,9 @@ OPENAI_API_KEY=sk-...
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 시스템 아키텍처, 데이터 흐름, 컴포넌트 설명 |
 | [HANDOFF.md](HANDOFF.md) | 개발 핸드오프 노트 |
 | [docs/api.md](docs/api.md) | 전체 API 엔드포인트 레퍼런스 |
+| [docs/agent-runner-pi.md](docs/agent-runner-pi.md) | Pi Coding Agent adapter 설계/구현 상태 |
+| [docs/usage-telemetry-spec.md](docs/usage-telemetry-spec.md) | Usage Telemetry A안 구현 스펙 |
+| [docs/product-assessment-and-skill-converter.md](docs/product-assessment-and-skill-converter.md) | 제품성 평가와 Skill Converter 구현/API |
 | [docs/prd.md](docs/prd.md) | 제품 요구사항 정의서 |
 | [docs/git-safety.md](docs/git-safety.md) | Git 연동 안전 가이드 |
 | [docs/1pager.md](docs/1pager.md) | 프로젝트 기획 배경 및 목표 |

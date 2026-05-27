@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import './App.css';
 
-const API_BASE = "http://127.0.0.1:8766";
+const API_BASE = "";
 
 export default function ArchitectureGraph({ workspace }) {
   const containerRef = useRef(null);

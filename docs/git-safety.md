@@ -1,5 +1,7 @@
 # Git 연동 안전 가이드
 
+> 현황(2026-05-27): 초기 문서는 `~/.hermes` 중심으로 작성되었지만, 서버의 Git API는 `workspace` 또는 `path` 기준으로 허용된 agent workspace의 git 상태를 다룬다. Hermes 실데이터 수정에는 여전히 `~/.hermes` git init을 가장 권장하고, Claude/Codex 등 다른 workspace는 해당 디렉토리가 git repo일 때 동일한 이력/감사 패턴을 적용할 수 있다. Pi Agent Runner는 실행 전후 `GET /api/git/audit`으로 diff/risk를 캡처한다.
+
 ## 왜 Git인가?
 
 | 방법 | 보호 범위 | 이력 | 선택 복원 |
@@ -82,6 +84,7 @@ Apply 버튼 클릭 → `/api/save` 호출 → 자동 커밋
 | `/api/git/log` | GET | 커밋 이력 조회 (`?path=...`로 파일 필터) |
 | `/api/git/diff` | GET | 특정 커밋의 변경 내용 (`?commit_hash=...`) |
 | `/api/git/rollback` | POST | 특정 커밋으로 파일 복원 |
+| `/api/git/audit` | GET | workspace git status/stat 기반 risk audit |
 
 ---
 

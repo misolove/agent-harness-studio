@@ -8,7 +8,7 @@ AI 에이전트의 하네스(메모리·스킬·훅·MCP·루트 컨텍스트)�
 
 | 대상 | 상황/특징 |
 |------|-----------|
-| AI 에이전트 파워 유저 | Claude Code, Hermes, Codex, OpenCode 등을 매일 쓰지만 하네스 설정이 분산되어 관리 피로가 큼 |
+| AI 에이전트 파워 유저 | Claude Code, Hermes, Cursor, Codex, OpenClaw, Gemini/Antigravity 등을 매일 쓰지만 하네스 설정이 분산되어 관리 피로가 큼 |
 | 개발자/인프라 엔지니어 | 에이전트 인프라를 구축하며, 팀원 전체가 일관된 Harness를 유지보수해야 함 |
 | 비개발자 (PM/기획자) | 코딩 없이 "말로" 자신의 업무용 에이전트 성격과 기능을 조정하고 싶음 |
 | 오픈소스 커뮤니티 | 자신의 Harness 구성(스킬 셋, 프롬프트, 훅)을 공유하고, 다른 사람의 구성을 가져와 쓰고 싶음 |
@@ -34,7 +34,7 @@ AI 에이전트의 하네스(메모리·스킬·훅·MCP·루트 컨텍스트)�
 | 항목 | 수치/상태 | 비고 |
 |------|-----------|------|
 | 하네스 설정 파일 위치 | 최소 5개 경로 분산 | AGENTS.md, config.yaml, skills/, .env, mcp_servers |
-| 에이전트 종류 | Claude Code, Hermes, Codex, OpenCode, Cursor 등 5+ | 각각 하네스 포맷이 다름 |
+| 에이전트 종류 | Claude Code, Hermes, Cursor, Codex, OpenClaw, Gemini/Antigravity 등 7+ | 각각 하네스 포맷이 다름 |
 | 설정 변경 → 반영까지 | 세션 재시작 필요 (30초~수분) | 즉각 피드백 불가 |
 | Anthropic 블로그 발표 | 2026.05.14 "Harness matters" 공식화 | 하네스 관리 도구의 필요성 업계 공감대 형성 중 |
 
@@ -56,8 +56,29 @@ Claude Code는 `CLAUDE.md` + `~/.claude/skills/`, Hermes는 `AGENTS.md` + `~/.he
 | 하네스 상태 가시성 | 5개 분산 파일 → 1개 대시보드 화면에서 100% 파악 |
 | 설정 변경 방식 | 파일 직접 편집 → 자연어 채팅으로 90% 커버 |
 | 변경 → 반영 시간 | 세션 재시작(30초~수분) → 실시간(3초 이내) |
-| 에이전트 지원 | Hermes 우선, Claude Code / Codex / OpenCode 순 확장 |
+| 에이전트 지원 | Hermes, Claude Code, Cursor, Codex, OpenClaw, Gemini/Antigravity, Studio 자체 1차 스캔 완료 |
 | 오픈소스 커뮤니티 | 첫 달 GitHub Star 500+, Harness 템플릿 공유 마켓플레이스 |
+
+## 4.1 현재 구현 현황 (2026-05-27)
+
+MVP는 단순 Hermes inspector를 넘어 **local agent ops console** 성격으로 확장되었다.
+
+완료된 축:
+- **멀티 워크스페이스 스캔**: Hermes, Claude Code, Cursor, Codex, OpenClaw, Gemini CLI, Antigravity, Harness Studio 자체.
+- **관측 표면 확장**: Skills, Skill Bundles/Subagents, MCP, Hooks, Memory, Cron, Plugins/Commands, Context, Config, Logs, Sessions, State DB, Checkpoints, Diff Audit.
+- **안전 편집**: `/api/read`, `/api/save`, 자동 `.bak.*`, git init/log/diff/rollback, SQLite audit log, READONLY 모드.
+- **Usage Telemetry A안**: Claude Code jsonl 세션 로그를 파싱해 Skill/Subagent invocation 집계.
+- **Smart Diet**: 사용량 + 토큰 + 수정시각 기반 `HIGH_VALUE`, `STALE_UNUSED`, `ARCHIVE`, `HEAVY_UNUSED` 추천.
+- **Skill Converter 1차**: Claude Code Skill 선택 → Hermes metadata로 변환 → `~/.hermes/skills/{name}/SKILL.md` 주입.
+- **Agent Runner 1차**: 설치된 Pi Coding Agent CLI 감지, provider/model 표시, read-only run, 로그 tail, pre/post diff audit.
+- **Chat Molder 고도화**: LLM mode와 Pi Agent mode를 모두 지원하고, Pi mode는 `read,grep,find,ls,web_search`로 세션 연속 대화 가능.
+
+최근 검증값:
+- Claude Code Smart 추천: 263개 (`HIGH_VALUE:1`, `STALE_UNUSED:72`, `ARCHIVE:190`)
+- Cursor 등 미지원 telemetry workspace: unsupported + 빈 추천 리스트로 graceful degrade
+- Skill Converter dry-run: `agency-client-interview` → `/Users/letitbe/.hermes/skills/agency-client-interview/SKILL.md`
+- `python3 -m py_compile src/server/app.py`
+- `cd src/ui && npm run build`
 
 ## 5. 현황 및 분석
 
@@ -99,7 +120,7 @@ Claude Code는 `CLAUDE.md` + `~/.claude/skills/`, Hermes는 `AGENTS.md` + `~/.he
 
 | 영향도 | 리스크 | 대응 방안 |
 |--------|--------|-----------|
-| 상 | 에이전트별 포맷 파편화 → 추상화 레이어 복잡도 폭발 | Phase 1은 Hermes 단일 에이전트에 집중, 공통 모델은 경험 기반으로 점진 추상화 |
+| 상 | 에이전트별 포맷 파편화 → 추상화 레이어 복잡도 폭발 | 2026-05-27 현재 BaseScanner + workspace별 scanner로 1차 정규화 완료. 다음은 섹션별 공통 capability contract를 문서화 |
 | 상 | 자연어 편집이 YAML/MD 문법을 정확히 수정하지 못함 | LLM 기반 파싱 + 적용 전 diff 컨펌 + 롤백 체크포인트 |
 | 중 | 파일 watch 동기화 지연/누락 | 파일시스템 이벤트 + 주기적 폴링 하이브리드 |
 | 중 | 보안: .env(API 키) 노출 위험 | 대시보드에서 API 키는 마스킹 표시, 채팅으로는 키 값 직접 수정 불가 |

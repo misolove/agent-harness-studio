@@ -15,7 +15,7 @@ TOKEN_EXCLUDED_DIRS = {
     "sessions",
     "state",
 }
-TOKEN_EXCLUDED_SUFFIXES = {".bak", ".db", ".lock", ".sqlite", ".sqlite3"}
+TOKEN_EXCLUDED_SUFFIXES = {".bak", ".db", ".lock", ".sqlite", ".sqlite3", ".pb", ".pbtxt", ".bin", ".proto"}
 MAX_TOKEN_ESTIMATE_FILE = 50000
 MAX_TOKEN_ESTIMATE_DIR = 50000
 MAX_TOKEN_ESTIMATE_FILES_PER_DIR = 100
@@ -48,16 +48,85 @@ def _as_list(value: Any) -> List[Any]:
         return value
     return [value]
 
+def resolve_representative_file(path: Path) -> Optional[Path]:
+    """Return the best editable file for a harness path that may be a directory/symlink."""
+    try:
+        resolved = path.resolve(strict=False)
+    except Exception:
+        resolved = path
+    if resolved.is_file():
+        return resolved
+    if not resolved.is_dir():
+        return None
+    preferred_names = [
+        "SKILL.md",
+        "AGENTS.md",
+        "CLAUDE.md",
+        "GEMINI.md",
+        "README.md",
+        "plugin.yaml",
+        "plugin.yml",
+        "plugin.json",
+        "config.toml",
+        "config.json",
+        "settings.json",
+    ]
+    for name in preferred_names:
+        candidate = resolved / name
+        if candidate.is_file():
+            return candidate
+    for pattern in ("*.md", "*.mdc", "*.toml", "*.yaml", "*.yml", "*.json", "*.rules", "*.txt", "*.py", "*.sh"):
+        matches = sorted(resolved.glob(pattern))
+        if matches:
+            return matches[0]
+    return None
+
 class BaseHarnessScanner:
     """Abstract base class for all agent workspace scanners."""
 
     def __init__(self, workspace_dir: str):
         self.workspace_dir = Path(workspace_dir)
 
+    def _finalize_items(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Annotate paths consistently and add token estimates."""
+        for item in items:
+            source_path = item.get("source_path")
+            if source_path:
+                path = Path(source_path)
+                representative = resolve_representative_file(path)
+                metadata = item.setdefault("metadata", {})
+                should_preserve_directory = item.get("type") == "Memory Directory" or metadata.get("preserve_directory")
+                if should_preserve_directory:
+                    if representative:
+                        metadata["representative_file"] = str(representative)
+                elif representative and representative != path:
+                    metadata["original_source_path"] = str(path)
+                    metadata["representative_file"] = str(representative)
+                    item["source_path"] = str(representative)
+                metadata["is_directory"] = Path(item["source_path"]).is_dir()
+            item["token_estimate"] = self._estimate_tokens_for_item(item)
+        return items
+
     def _estimate_tokens_for_item(self, item: Dict[str, Any]) -> int:
         if item.get("type") in {"Memory State"}:
             return 0
-        if item.get("type") in {"Cron Job", "Hook", "MCP Server", "Plugin", "Skill", "Skill Bundle"}:
+        if item.get("metadata", {}).get("prompt_injected") is False:
+            return 0
+        if item.get("type") == "Skill":
+            metadata = item.get("metadata", {})
+            payload = {
+                "category": metadata.get("category"),
+                "name": item.get("name"),
+            }
+            return max(1, len(json.dumps(payload, ensure_ascii=False, default=str)) // 4)
+        if item.get("type") == "Memory Config":
+            payload = {
+                "type": item.get("type"),
+                "name": item.get("name"),
+                "summary": item.get("summary"),
+            }
+            return max(1, len(json.dumps(payload, ensure_ascii=False, default=str)) // 4)
+        if item.get("type") in {"Cron Job", "Hook", "MCP Server", "Plugin", "Skill Bundle"}:
             payload = {
                 "type": item.get("type"),
                 "name": item.get("name"),

@@ -26,8 +26,12 @@ class CursorScanner(BaseHarnessScanner):
             })
             
         # 2. Modular Rules (.cursor/rules/*.mdc)
-        rules_dir = self.workspace_dir / ".cursor" / "rules"
-        if rules_dir.exists():
+        candidate_rule_dirs = [self.workspace_dir / ".cursor" / "rules", self.workspace_dir / "rules"]
+        seen_rule_dirs = set()
+        for rules_dir in candidate_rule_dirs:
+            if not rules_dir.exists() or rules_dir in seen_rule_dirs:
+                continue
+            seen_rule_dirs.add(rules_dir)
             for rule_file in rules_dir.glob("*.mdc"):
                 metadata = {"category": "MDC Rules"}
                 summary = "Modular Cursor Rule"
@@ -61,13 +65,26 @@ class CursorScanner(BaseHarnessScanner):
                     if skill_dir.is_dir():
                         skill_md = skill_dir / "SKILL.md"
                         if skill_md.exists():
+                            metadata = {"category": "Global Skills"}
+                            summary = "Cursor Global Skill"
+                            try:
+                                content = skill_md.read_text(encoding="utf-8")
+                                if content.startswith("---"):
+                                    parts = content.split("---", 2)
+                                    if len(parts) >= 3:
+                                        frontmatter = yaml.safe_load(parts[1])
+                                        if isinstance(frontmatter, dict):
+                                            metadata.update(frontmatter)
+                                            summary = frontmatter.get("description", summary)
+                            except Exception:
+                                pass
                             results.append({
                                 "type": "Skill",
                                 "name": skill_dir.name,
                                 "source_path": str(skill_md),
                                 "state": "ACTIVE",
-                                "summary": "Cursor Global Skill",
-                                "metadata": {"category": "Global Skills"}
+                                "summary": summary,
+                                "metadata": metadata
                             })
 
         # 4. Plugins
@@ -101,7 +118,4 @@ class CursorScanner(BaseHarnessScanner):
                     }
                 })
 
-        for item in results:
-            item["token_estimate"] = self._estimate_tokens_for_item(item)
-
-        return results
+        return self._finalize_items(results)

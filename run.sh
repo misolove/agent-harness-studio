@@ -3,7 +3,7 @@
 # Designed for macOS launchctl: RunAtLoad + KeepAlive
 set -e
 
-PROJECT_ROOT="~/agent-harness-studio"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FRONTEND_DIR="$PROJECT_ROOT/src/ui"
 LOG_DIR="$HOME/Library/Logs/agent-harness-studio"
 
@@ -24,7 +24,7 @@ fi
 
 # ── Harness Target ─────────────────────────
 # 실데이터 (기본값) — ~/.hermes가 git repo이면 모든 변경이 커밋으로 기록됩니다.
-HARNESS_HOME="${HERMES_HOME:-~/.hermes}"
+HARNESS_HOME="${HERMES_HOME:-$HOME/.hermes}"
 # 샌드박스로 전환: HERMES_HOME=~/.hermes/sandbox ./run.sh
 # 읽기 전용 모드: HARNESS_READONLY=1 ./run.sh
 
@@ -44,7 +44,7 @@ cd "$PROJECT_ROOT"
 HERMES_HOME="$HARNESS_HOME" \
 HARNESS_READONLY="${HARNESS_READONLY:-0}" \
   python -m uvicorn src.server.app:app \
-    --host 127.0.0.1 \
+    --host 0.0.0.0 \
     --port 8766 \
     --log-level info &
 BACKEND_PID=$!
@@ -52,7 +52,7 @@ BACKEND_PID=$!
 # ── Start Frontend ─────────────────────────
 echo "[$(date)] 🚀 Starting Frontend on http://localhost:5173"
 cd "$FRONTEND_DIR"
-npx vite --host localhost --port 5173 &
+npx vite --host 0.0.0.0 --port 5173 &
 FRONTEND_PID=$!
 
 # ── Health Check (after brief wait) ────────

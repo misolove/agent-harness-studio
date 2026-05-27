@@ -48,6 +48,9 @@
 | **범용 텍스트 파일 편집 (Universal Edit)** | `App.jsx` + `app.py` | 완료 (2026-05-25 추가) |
 | **Chat Molder 대화형 UI & 마크다운 렌더러** | `App.jsx` (`MarkdownContent`) | 완료 (2026-05-25 개선) |
 | **LLM 응답 파싱 강건성 및 히스토리 유지** | `app.py` (`parse_molder_json`) | 완료 (2026-05-25 개선) |
+| **다중 에이전트 워크스페이스 지원** | `/api/workspaces` + `App.jsx` | 완료 (2026-05-25 추가) |
+| **오프라인 코드 에디터 (PrismJS)** | `App.jsx` (`react-simple-code-editor`) | 완료 (2026-05-25 추가) |
+| **UI 에러 방어막 (ErrorBoundary)** | `App.jsx` (`EditorErrorBoundary`) | 완료 (2026-05-25 추가) |
 | 샌드박스 모드 (`HERMES_HOME=~/.hermes/sandbox`) | `run.sh` | 지원됨. 기본 run.sh는 실데이터 `~/.hermes` |
 
 ### 미구현 기능 (PRD 기준)
@@ -61,7 +64,25 @@
 
 ---
 
-## 3. 수정된 버그 (2026-05-24)
+## 3. 수정된 버그 (2026-05-25 업데이트)
+
+### [CRITICAL] Edit 버튼 클릭 시 HTTP 500 오류 (NameError)
+- **증상**: 다른 워크스페이스(예: `.codex`)의 파일을 열 때 HTTP 500 에러 발생.
+- **원인**: `app.py`에서 다중 경로 보안 검증을 위한 `_get_allowed_roots()` 함수가 누락됨.
+- **수정**: 해당 함수를 복구하여 `~/.hermes`, `~/.claude`, `~/.cursor`, `~/.codex` 등 여러 에이전트 경로를 안전하게 지원하도록 조치.
+
+### [CRITICAL] Edit 뷰 화이트 스크린 (React Crash)
+- **증상**: 에디터 모듈 로드 실패나 구문 분석 에러 시 전체 UI가 사라지는 현상.
+- **원인**:
+  - `@monaco-editor/react` 사용 시 CDN 차단 또는 CJS 객체 매핑(default export) 문제로 인한 React 렌더링 실패.
+  - `import` 구문 위치(클래스 선언부 하단)로 인한 모듈 로더 SyntaxError.
+- **수정**:
+  - 외부 CDN 의존성이 없는 완전 로컬 모듈(`react-simple-code-editor` + `prismjs`)로 교체.
+  - 에디터 컴포넌트 렌더링을 래핑하는 `<EditorErrorBoundary>` 컴포넌트를 추가하여 화면 전체가 죽지 않고 에러 메시지와 재시도 버튼만 표시되도록 안전성 대폭 강화.
+
+---
+
+## 3.1. 이전 수정 사항 (2026-05-24)
 
 ### [CRITICAL] handleEditClick 더미 내용 덮어쓰기
 - **증상**: Edit 버튼 클릭 시 실제 파일 내용 대신 더미 템플릿을 에디터에 로드

@@ -1,5 +1,7 @@
 # [Wireframe] Agent Harness Studio
 
+> Current implementation note (2026-05-27): Type A가 실제 UI의 기준이 되었다. 현재 화면은 workspace selector, 섹션 카드, 검색/정렬 가능한 목록, Logs tail read, Sessions/State DB/Checkpoints, Smart Diet, Diff Audit, Agent Runner, LLM/Pi Agent 전환형 Chat Molder를 포함한다. 아래 Type B/C는 탐색 아이디어로 유지한다.
+
 ## 화면 목적
 - AI 에이전트의 하네스 전체 상태를 한눈에 파악(Inspection)
 - 자연어 채팅을 통해 하네스를 실시간으로 수정(Molding)
@@ -8,8 +10,8 @@
 ---
 
 ## 공통 요구사항
-- 상단: 에이전트 상태(Active/Warning/Error), 현재 선택된 프로필(Hermes 등)
-- 중앙: 6대 하네스 영역(Memory, Skills, Hooks, MCP, Context, Config) 요약 카드
+- 상단: 에이전트 상태(Active/Warning/Error), 현재 선택된 workspace(Hermes/Claude/Cursor/Codex/Gemini 등)
+- 중앙: 하네스 영역(Memory, Skills, Hooks, MCP, Context, Config, Logs, Sessions, State DB, Checkpoints, Agent Runner) 요약 카드
 - 우측 또는 하단: Chat Molder (자연어 수정 인터페이스)
 - 변경 제안 시: Diff 뷰 + Apply/Reject 버튼
 

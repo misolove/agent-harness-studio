@@ -1,16 +1,18 @@
 # Web Content Extraction Comparison: Firecrawl vs. Insane-Search
 
-This document evaluates the current Firecrawl integration against the proposed "Insane-Search" phased approach for the Agent Harness Studio Web Context feature.
+This document records the original Firecrawl vs. "Insane-Search" decision and the current hybrid implementation for the Agent Harness Studio Web Context feature.
+
+> Implementation update (2026-05-27): the hybrid strategy below has been implemented under `src/server/scrapers/`. `/api/web/scrape` now orchestrates Firecrawl → Jina → TLS/curl_cffi → Browser/Playwright-style fallback and returns pipeline phase details for the UI.
 
 ## Feature Overview
 
-Agent Harness Studio requires a reliable way to turn public URLs into clean Markdown context for AI agents. Currently, this is handled via a single `/api/web/scrape` endpoint using the Firecrawl SDK.
+Agent Harness Studio requires a reliable way to turn public URLs into clean Markdown context for AI agents. The current `/api/web/scrape` endpoint uses a hybrid pipeline rather than Firecrawl alone.
 
 ---
 
 ## Comparison Matrix
 
-| Feature | Firecrawl (Current) | Insane-Search (Phased) |
+| Feature | Firecrawl Phase | Local Fallback Phases |
 |:---|:---|:---|
 | **Primary Method** | Cloud API (SaaS) | Local / Distributed Probes |
 | **Authentication** | Required (`FIRECRAWL_API_KEY`) | None (except premium targets) |
@@ -36,9 +38,9 @@ The "Insane-Search" approach follows a 4-phase adaptive loop to ensure maximum s
 
 ## Recommendation
 
-**Verdict: Hybrid Strategy (Primary + Fallback)**
+**Verdict: Hybrid Strategy (Primary + Fallback) — Implemented**
 
-I recommend implementing **both** approaches in a tiered strategy to provide the best user experience:
+The implemented approach uses **both** paths in a tiered strategy:
 
 1.  **Primary: Firecrawl (if key available)**: If the user has provided a `FIRECRAWL_API_KEY`, use it as the default. It provides the highest quality and offloads compute/proxy management to the service.
 2.  **Fallback/Default: Insane-Search**: For users without an API key, or if Firecrawl fails (rate limits/unsupported pages), trigger the Insane-Search pipeline.
@@ -50,28 +52,23 @@ I recommend implementing **both** approaches in a tiered strategy to provide the
 
 ---
 
-## Integration Plan (Backend)
+## Integration Status (Backend)
 
-### 1. Refactor `src/server/app.py`
-Move the scraping logic into a dedicated module `src/server/services/web_context.py`.
+### 1. Scraper modules
+The scraping logic lives in dedicated modules:
 
-```python
-# Proposed Structure
-class WebScraper:
-    def scrape(self, url: str):
-        if self.has_firecrawl_key():
-            try:
-                return self.firecrawl_scrape(url)
-            except Exception:
-                pass # Fallback to insane-search
-        
-        return self.insane_search_scrape(url)
+```
+src/server/scrapers/hybrid.py
+src/server/scrapers/firecrawl_scraper.py
+src/server/scrapers/jina_scraper.py
+src/server/scrapers/tls_scraper.py
+src/server/scrapers/browser_scraper.py
 ```
 
 ### 2. Dependency Management
-- Add `curl_cffi` and `playwright` to `pyproject.toml` or `requirements.txt`.
-- Add a setup script to run `playwright install chromium` on first use or during installation.
+- `curl_cffi` is used by the TLS phase when available.
+- Browser fallback requires local browser support; if missing, the earlier phases still work.
 
 ### 3. UI Updates
-- Indicate in the Web Context panel which "Phase" or "Provider" was used to extract the content.
-- Provide a toggle in settings to "Prefer Local Extraction (Insane-Search)" vs "Prefer Cloud (Firecrawl)".
+- The Web Context panel renders pipeline phase/provider output through `ScrapingPipeline.jsx`.
+- A future settings toggle can still expose provider preference, but the default path is already automatic fallback.

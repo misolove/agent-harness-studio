@@ -18,10 +18,11 @@ class OpenClawScanner(BaseHarnessScanner):
                 "name": "openclaw.json",
                 "source_path": str(config_path),
                 "state": "ACTIVE",
-                "summary": "OpenClaw configuration",
+                "summary": "OpenClaw process config (not LLM context)",
                 "metadata": {
                     "size_bytes": config_path.stat().st_size,
-                    "exists": True
+                    "exists": True,
+                    "on_demand": True
                 }
             })
             
@@ -163,7 +164,4 @@ class OpenClawScanner(BaseHarnessScanner):
                         "metadata": {}
                     })
 
-        for item in results:
-            item["token_estimate"] = self._estimate_tokens_for_item(item)
-
-        return results
+        return self._finalize_items(results)

@@ -1,8 +1,7 @@
 import json
 import yaml
-from pathlib import Path
 from typing import Dict, List, Any
-from .base_scanner import BaseHarnessScanner
+from .base_scanner import BaseHarnessScanner, mask_env_dict, mask_sensitive_mapping
 
 class GeminiCliScanner(BaseHarnessScanner):
     """Scanner to detect Gemini CLI harness components (~/.gemini)."""
@@ -11,7 +10,8 @@ class GeminiCliScanner(BaseHarnessScanner):
         results = []
         
         # 1. Configs & MCP Servers
-        for config_name in ["settings.json", "projects.json", "state.json", "config.yaml", "config.json"]:
+        seen_mcp_servers = set()
+        for config_name in ["settings.json", "projects.json", "state.json", "config.yaml", "config.json", "config/mcp_config.json", "config/config.json"]:
             config_file = self.workspace_dir / config_name
             if config_file.exists():
                 results.append({
@@ -26,24 +26,33 @@ class GeminiCliScanner(BaseHarnessScanner):
                     }
                 })
                 
-                # Check for MCP servers in settings.json
-                if config_name == "settings.json":
-                    try:
-                        content = json.loads(config_file.read_text(encoding="utf-8"))
-                        mcp_servers = content.get("mcpServers", {})
+                try:
+                    content = json.loads(config_file.read_text(encoding="utf-8"))
+                    mcp_servers = content.get("mcpServers", {}) or content.get("mcp_servers", {})
+                    if isinstance(mcp_servers, dict):
                         for mcp_name, mcp_config in mcp_servers.items():
+                            if mcp_name in seen_mcp_servers or not isinstance(mcp_config, dict):
+                                continue
+                            seen_mcp_servers.add(mcp_name)
+                            transport = "http" if mcp_config.get("url") else "stdio"
+                            enabled = mcp_config.get("enabled", True)
                             results.append({
                                 "type": "MCP Server",
                                 "name": mcp_name,
                                 "source_path": str(config_file),
-                                "state": "ACTIVE",
-                                "summary": f"MCP: {mcp_config.get('command', 'unknown')}",
+                                "state": "ACTIVE" if enabled else "INACTIVE",
+                                "summary": f"Gemini MCP ({transport})",
                                 "metadata": {
-                                    "command": mcp_config.get("command")
+                                    "transport": transport,
+                                    "command": mcp_config.get("command"),
+                                    "args": mcp_config.get("args", []),
+                                    "url": mcp_config.get("url"),
+                                    "env": mask_env_dict(mcp_config.get("env", {})),
+                                    "raw": mask_sensitive_mapping(mcp_config),
                                 }
                             })
-                    except Exception:
-                        pass
+                except Exception:
+                    pass
 
         # 2. Root Context
         gemini_md = self.workspace_dir / "GEMINI.md"
@@ -119,7 +128,4 @@ class GeminiCliScanner(BaseHarnessScanner):
                             }
                         })
 
-        for item in results:
-            item["token_estimate"] = self._estimate_tokens_for_item(item)
-
-        return results
+        return self._finalize_items(results)

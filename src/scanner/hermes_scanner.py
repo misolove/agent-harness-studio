@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import yaml
 import json
 import re
@@ -81,6 +82,22 @@ class HermesScanner:
     def _estimate_tokens_for_item(self, item: Dict[str, Any]) -> int:
         if item.get("type") in {"Memory State"}:
             return 0
+        if item.get("metadata", {}).get("prompt_injected") is False:
+            return 0
+        if item.get("type") == "Skill":
+            metadata = item.get("metadata", {})
+            payload = {
+                "category": metadata.get("category"),
+                "name": item.get("name"),
+            }
+            return max(1, len(json.dumps(payload, ensure_ascii=False, default=str)) // 4)
+        if item.get("type") == "Memory Config":
+            payload = {
+                "type": item.get("type"),
+                "name": item.get("name"),
+                "summary": item.get("summary"),
+            }
+            return max(1, len(json.dumps(payload, ensure_ascii=False, default=str)) // 4)
         if item.get("type") in METADATA_TOKEN_ITEM_TYPES:
             payload = {
                 "type": item.get("type"),
@@ -137,6 +154,9 @@ class HermesScanner:
         results.extend(self._scan_hooks())
         results.extend(self._scan_cron())
         results.extend(self._scan_plugins())
+        results.extend(self._scan_sessions())
+        results.extend(self._scan_statedb())
+        results.extend(self._scan_checkpoints())
 
         for item in results:
             item["token_estimate"] = self._estimate_tokens_for_item(item)
@@ -455,17 +475,45 @@ class HermesScanner:
                 }
             })
 
-        # 2. Project AGENTS.md
+        # 2. Project context. Hermes loads .hermes.md/HERMES.md before AGENTS.md,
+        # so the payload estimate should mirror the actual prompt builder.
+        project_context_dir = self.hermes_dir / "hermes-agent"
+        project_pointer = None
+        for pointer_name in [".hermes.md", "HERMES.md"]:
+            candidate = project_context_dir / pointer_name
+            if candidate.exists():
+                project_pointer = candidate
+                break
+
+        if project_pointer:
+            results.append({
+                "type": "Root Context",
+                "name": project_pointer.name,
+                "source_path": str(project_pointer),
+                "state": "ACTIVE",
+                "summary": "Project context pointer loaded before AGENTS.md",
+                "metadata": {
+                     "size_bytes": project_pointer.stat().st_size,
+                     "prompt_injected": True,
+                     "supersedes": "AGENTS.md",
+                }
+            })
+
         project_agents = self.hermes_dir / "hermes-agent" / "AGENTS.md"
         if project_agents.exists():
             results.append({
                 "type": "Root Context",
                 "name": "Project AGENTS.md",
                 "source_path": str(project_agents),
-                "state": "ACTIVE",
-                "summary": "Project-specific agent behavior definition",
+                "state": "REFERENCE" if project_pointer else "ACTIVE",
+                "summary": (
+                    "Full project guide; read on demand when .hermes.md is insufficient"
+                    if project_pointer else
+                    "Project-specific agent behavior definition"
+                ),
                 "metadata": {
-                     "size_bytes": project_agents.stat().st_size
+                     "size_bytes": project_agents.stat().st_size,
+                     "prompt_injected": not bool(project_pointer),
                 }
             })
 
@@ -722,6 +770,191 @@ class HermesScanner:
                 }
             })
 
+        return results
+
+
+    def _scan_sessions(self) -> List[Dict[str, Any]]:
+        """state.db sessions 테이블 집계 통계를 반환."""
+        state_db = self.hermes_dir / "state.db"
+        if not state_db.exists():
+            return []
+        try:
+            conn = sqlite3.connect(str(state_db))
+            conn.row_factory = sqlite3.Row
+            stats = conn.execute("""
+                SELECT
+                    COUNT(*) as total_sessions,
+                    MIN(started_at) as first_session,
+                    MAX(started_at) as last_session,
+                    SUM(COALESCE(message_count, 0)) as total_messages,
+                    SUM(COALESCE(tool_call_count, 0)) as total_tool_calls,
+                    SUM(COALESCE(estimated_cost_usd, 0)) as total_cost_usd,
+                    SUM(COALESCE(input_tokens, 0)) as total_input_tokens,
+                    SUM(COALESCE(output_tokens, 0)) as total_output_tokens
+                FROM sessions
+            """).fetchone()
+            models = [
+                {"model": row[0], "count": row[1]}
+                for row in conn.execute("""
+                    SELECT model, COUNT(*) as cnt FROM sessions
+                    WHERE model IS NOT NULL
+                    GROUP BY model ORDER BY cnt DESC LIMIT 8
+                """).fetchall()
+            ]
+            sources = [
+                {"source": row[0], "count": row[1]}
+                for row in conn.execute("""
+                    SELECT source, COUNT(*) as cnt FROM sessions
+                    WHERE source IS NOT NULL
+                    GROUP BY source ORDER BY cnt DESC
+                """).fetchall()
+            ]
+            recent = [
+                {
+                    "id": row[0],
+                    "title": row[1],
+                    "model": row[2],
+                    "started_at": row[3],
+                    "message_count": row[4],
+                    "cost_usd": row[5],
+                }
+                for row in conn.execute("""
+                    SELECT id, title, model, started_at, message_count, estimated_cost_usd
+                    FROM sessions WHERE title IS NOT NULL AND title != ''
+                    ORDER BY started_at DESC LIMIT 5
+                """).fetchall()
+            ]
+            conn.close()
+            total_s = int(stats["total_sessions"] or 0)
+            total_m = int(stats["total_messages"] or 0)
+            return [{
+                "type": "Session Summary",
+                "name": "Sessions",
+                "source_path": str(state_db),
+                "state": "ACTIVE",
+                "summary": f"{total_s:,}개 세션 / {total_m:,}개 메시지",
+                "metadata": {
+                    "total_sessions": total_s,
+                    "total_messages": total_m,
+                    "total_tool_calls": int(stats["total_tool_calls"] or 0),
+                    "total_cost_usd": round(float(stats["total_cost_usd"] or 0), 4),
+                    "total_input_tokens": int(stats["total_input_tokens"] or 0),
+                    "total_output_tokens": int(stats["total_output_tokens"] or 0),
+                    "first_session": stats["first_session"],
+                    "last_session": stats["last_session"],
+                    "models": models,
+                    "sources": sources,
+                    "recent_sessions": recent,
+                },
+            }]
+        except Exception as e:
+            return [{
+                "type": "Session Summary",
+                "name": "Sessions",
+                "source_path": str(state_db),
+                "state": "ERROR",
+                "summary": f"DB 읽기 오류: {e}",
+                "metadata": {},
+            }]
+
+    def _scan_statedb(self) -> List[Dict[str, Any]]:
+        """~/.hermes/*.db SQLite 파일들의 테이블 구조 스캔."""
+        results = []
+        db_descriptions = {
+            "state.db": "에이전트 세션·메시지 DB",
+            "kanban.db": "칸반 태스크 DB",
+            "harness_studio.db": "Harness Studio 감사 로그 DB",
+        }
+        for db_name, description in db_descriptions.items():
+            db_path = self.hermes_dir / db_name
+            if not db_path.exists():
+                continue
+            try:
+                conn = sqlite3.connect(str(db_path))
+                tables_raw = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                    " AND name NOT LIKE '%_fts%'"
+                    " AND name NOT LIKE 'sqlite_%'"
+                ).fetchall()
+                tables = []
+                for (tname,) in tables_raw:
+                    count = conn.execute(f'SELECT COUNT(*) FROM "{tname}"').fetchone()[0]
+                    cols = [c[1] for c in conn.execute(f'PRAGMA table_info("{tname}")').fetchall()]
+                    tables.append({"name": tname, "rows": count, "columns": cols[:8]})
+                conn.close()
+                size_bytes = db_path.stat().st_size
+                total_rows = sum(t["rows"] for t in tables)
+                results.append({
+                    "type": "State DB",
+                    "name": db_name,
+                    "source_path": str(db_path),
+                    "state": "ACTIVE",
+                    "summary": description,
+                    "metadata": {
+                        "db_name": db_name,
+                        "size_bytes": size_bytes,
+                        "tables": tables,
+                        "table_count": len(tables),
+                        "total_rows": total_rows,
+                    },
+                })
+            except Exception as e:
+                results.append({
+                    "type": "State DB",
+                    "name": db_name,
+                    "source_path": str(db_path),
+                    "state": "ERROR",
+                    "summary": f"DB 읽기 오류: {e}",
+                    "metadata": {},
+                })
+        return results
+
+
+    def _scan_checkpoints(self) -> List[Dict[str, Any]]:
+        """~/.hermes/checkpoints/store/projects/ 프로젝트 체크포인트 스캔."""
+        import datetime
+        projects_dir = self.hermes_dir / "checkpoints" / "store" / "projects"
+        if not projects_dir.exists():
+            return []
+        results = []
+
+        def ts_to_str(ts: Any) -> Optional[str]:
+            if not ts:
+                return None
+            try:
+                return datetime.datetime.fromtimestamp(float(ts)).strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                return str(ts)
+
+        for proj_file in sorted(projects_dir.glob("*.json")):
+            try:
+                data = json.loads(proj_file.read_text(encoding="utf-8"))
+                proj_id = proj_file.stem
+                workdir = data.get("workdir", "(알 수 없음)")
+                created = ts_to_str(data.get("created_at"))
+                touched = ts_to_str(data.get("last_touch"))
+                results.append({
+                    "type": "Checkpoint",
+                    "name": proj_id[:20],
+                    "source_path": str(proj_file),
+                    "state": "ACTIVE",
+                    "summary": workdir,
+                    "metadata": {
+                        "project_id": proj_id,
+                        "workdir": workdir,
+                        "created_at": created,
+                        "last_touch": touched,
+                    },
+                })
+            except Exception as e:
+                results.append({
+                    "type": "Checkpoint",
+                    "name": proj_file.stem[:20],
+                    "source_path": str(proj_file),
+                    "state": "ERROR",
+                    "summary": f"파싱 오류: {e}",
+                    "metadata": {},
+                })
         return results
 
 

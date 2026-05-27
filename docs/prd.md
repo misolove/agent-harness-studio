@@ -5,13 +5,15 @@
 > 문서 상태: Draft  
 > 문서 버전: v0.1
 
+> 구현 현황 업데이트(2026-05-27): 초기 PRD는 Hermes 단일 MVP를 출발점으로 작성되었지만, 현재 앱은 Hermes/Claude Code/Cursor/Codex/OpenClaw/Gemini/Antigravity/Studio 자체까지 스캔한다. 또한 Logs, Sessions, State DB, Checkpoints, Usage Telemetry A안, Smart Diet, Claude→Hermes Skill Converter, Pi Coding Agent 기반 Agent Runner/Chat Molder Pi mode가 1차 구현되었다. 상세 API는 `docs/api.md`, 제품성/컨버터 평가는 `docs/product-assessment-and-skill-converter.md`, Pi adapter는 `docs/agent-runner-pi.md`를 기준으로 본다.
+
 ---
 
 # 0. 문서 개요
 
 ## 0-1. 프로젝트 요약
 
-Agent Harness Studio는 Hermes, Claude Code, Codex, OpenCode 같은 AI 에이전트의 하네스 구성요소를 웹 대시보드에서 시각화하고, LLM 채팅창을 통해 자연어로 수정하면 실제 설정 파일과 런타임에 즉시 반영되도록 하는 오픈소스 하네스 컨트롤 타워다.
+Agent Harness Studio는 Hermes, Claude Code, Cursor, Codex, OpenClaw, Gemini/Antigravity 같은 AI 에이전트의 하네스 구성요소를 웹 대시보드에서 시각화하고, LLM/Pi Agent 채팅창을 통해 자연어로 조사·수정하면 실제 설정 파일과 런타임에 즉시 반영되도록 하는 오픈소스 하네스 컨트롤 타워다.
 
 여기서 하네스는 다음을 포함한다.
 
@@ -34,7 +36,7 @@ AI 에이전트 운영자는 이미 다양한 설정 파일과 디렉터리를 �
 - Hermes: `~/.hermes/config.yaml`, `~/.hermes/skills/`, memory store, MCP servers, AGENTS.md
 - Claude Code: `CLAUDE.md`, `~/.claude/skills/`, hooks, plugins
 - Codex: `AGENTS.md`, `.codex/agents/*.toml`, subagent profiles
-- OpenCode / Cursor / 기타 에이전트: 각자 다른 config, memory, tool registry
+- Cursor / OpenClaw / Gemini / Antigravity / 기타 에이전트: 각자 다른 config, memory, tool registry
 
 하지만 개념적으로는 모두 비슷한 하네스 구조를 가진다. 문제는 이를 한눈에 보고, 안전하게 수정하고, 변경 결과를 즉시 확인하는 도구가 부족하다는 점이다.
 
@@ -66,8 +68,8 @@ AI 에이전트 운영자는 이미 다양한 설정 파일과 디렉터리를 �
 ### 제품 가치
 
 - AI 에이전트 파워 유저를 위한 “운영 콘솔” 카테고리를 선점한다.
-- Hermes 우선 지원으로 실제 동작 가능한 오픈소스 MVP를 빠르게 만든다.
-- 이후 Claude Code, Codex, OpenCode 등으로 확장 가능한 Common Harness Model을 정의한다.
+- Hermes 우선 MVP에서 출발하되, 현재는 Claude Code/Cursor/Codex/OpenClaw/Gemini/Antigravity까지 확장된 멀티 워크스페이스 콘솔로 발전시킨다.
+- BaseScanner 기반 Common Harness Model을 점진적으로 정의한다.
 
 ### 운영 가치
 
@@ -129,7 +131,7 @@ AI 에이전트 운영자는 이미 다양한 설정 파일과 디렉터리를 �
 
 ### Primary: Agent Power User / Developer
 
-- Hermes, Claude Code, Codex, OpenCode 등을 매일 사용한다.
+- Hermes, Claude Code, Cursor, Codex, OpenClaw, Gemini/Antigravity 등을 매일 사용한다.
 - 여러 에이전트 설정을 직접 수정해본 경험이 있다.
 - 메모리/스킬/훅/MCP를 튜닝해 생산성을 높이고 싶다.
 
@@ -245,14 +247,17 @@ AI 에이전트 운영자는 이미 다양한 설정 파일과 디렉터리를 �
 
 ### In Scope
 
-- Hermes 단일 프로필 우선 지원
-- 로컬 `~/.hermes` 경로 스캔
+- Hermes 단일 프로필 우선 지원 (완료 후 멀티 워크스페이스로 확장됨)
+- 로컬 `~/.hermes` 경로 스캔 및 `~/.claude`, `~/.cursor`, `~/.codex`, `~/.openclaw`, `~/.gemini`, Studio repo 스캔
 - skills 읽기/검색/수정
+- 대량 skill/log/session 목록의 검색/정렬
 - built-in memory/user profile 읽기 및 추가/삭제 proposal
 - config.yaml 일부 섹션 읽기/수정
 - MCP server 목록 및 연결 상태 표시
 - AGENTS.md/root context 읽기와 section-level 수정 proposal
-- 자연어 변경 → patch proposal → validation → apply
+- 자연어 변경 → patch proposal → validation → apply, 또는 Pi Agent read-only 조사
+- Usage Telemetry 기반 Smart Diet 추천
+- Claude Code Skill → Hermes Skill 변환/주입
 - snapshot/rollback
 
 ### Out of Scope
@@ -272,7 +277,7 @@ AI 에이전트 운영자는 이미 다양한 설정 파일과 디렉터리를 �
 
 ### FR-001. Harness Scan
 
-- 사용자의 로컬 환경에서 Hermes config, skills, memory, MCP, root context를 탐지한다.
+- 사용자의 로컬 환경에서 Hermes/Claude/Cursor/Codex/OpenClaw/Gemini/Antigravity config, skills, memory, MCP, root context를 탐지한다.
 - 각 항목은 source path, type, state, summary, last modified를 가진다.
 - parse 오류가 있으면 오류 위치와 원문 snippet을 저장한다.
 
@@ -552,9 +557,9 @@ Harness Core
 
 ## Phase 4. Multi-agent Expansion (후속)
 
-- Claude Code adapter
-- Codex adapter
-- OpenCode adapter
+- Claude Code/Cursor/Codex/OpenClaw/Gemini/Antigravity scanner 1차 완료
+- Pi Coding Agent runner adapter 1차 완료
+- OpenCode adapter는 아직 미구현 후보
 - community marketplace
 
 ---
