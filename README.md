@@ -131,7 +131,7 @@ Claude Code Skill을 Hermes Skill로 변환/주입합니다.
 | 백엔드 | FastAPI (Python 3.13+) + uvicorn | 8766 |
 | 프론트엔드 | React + Vite | 5173 |
 | 스캐너 | Hermes/Claude/Cursor/Codex/OpenClaw/Gemini/Antigravity/Studio scanners | — |
-| LLM | LLM proxy 로컬 프록시 → OpenAI API 폴백 | 20128 |
+| LLM | 로컬 LLM 프록시 → OpenAI API 폴백 | 20128 |
 | 데이터 소스 | `~/.hermes`, `~/.claude`, `~/.cursor`, `~/.codex`, `~/.openclaw`, `~/.gemini`, Studio repo | — |
 
 ---
@@ -401,7 +401,7 @@ OPENAI_API_KEY=sk-...
 
 ## 알려진 제약사항
 
-- **LLM proxy 의존성**: Chat Molder는 LLM proxy 또는 OpenAI API 키가 필요합니다. 둘 다 없으면 `/api/mold`에서 500 에러 발생.
+- **로컬 LLM 프록시 의존성**: Chat Molder는 로컬 LLM 프록시 또는 OpenAI API 키가 필요합니다. 둘 다 없으면 `/api/mold`에서 500 에러 발생.
 - **단일 사용자**: API 인증 없음. localhost 전용.
 - **대용량 스킬 디렉토리**: 스킬 수 >100개 시 스캔 속도 저하 가능 (동기 처리).
 - **브라우저 스크래퍼**: Phase 4 사용 시 `playwright install chromium` 필요.

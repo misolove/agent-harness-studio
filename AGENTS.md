@@ -112,8 +112,8 @@ Claude Code의 `~/.claude` 구조(CLAUDE.md, rules/, skills/, hooks/)와 다릅�
 두 에이전트를 모두 지원하려면 스캐너 추상화 레이어 필요.
 
 ### LLM Proxy
-Chat Molder는 OpenAI SDK를 LLM proxy(`http://localhost:20128/v1`)에 연결.
-LLM proxy가 없으면 LLM 기능 전체 불가. OpenAI API 키 폴백 필요.
+Chat Molder는 OpenAI SDK를 로컬 LLM 프록시(`http://localhost:20128/v1`)에 연결.
+로컬 LLM 프록시가 없으면 LLM 기능 전체 불가. OpenAI API 키 폴백 필요.
 
 ---
 
@@ -193,7 +193,7 @@ agent-harness-studio/
 
 ### P1 — 즉시 필요
 1. **훅/MCP/컨텍스트 Edit 버튼 추가**: 스킬 외 다른 타입도 편집 가능하게
-2. **LLM proxy 폴백**: LLM proxy 없을 때 OpenAI API 키로 자동 폴백
+2. **LLM 프록시 폴백**: 로컬 LLM 프록시가 없을 때 OpenAI API 키로 자동 폴백
 
 ### P2 — 주요 기능
 3. **변경 이력 UI**: `.bak.*` 파일 목록을 UI에서 보여주고 선택 롤백 가능하게
@@ -233,7 +233,7 @@ python src/scanner/hermes_scanner.py
 
 ## 9. 알려진 제약사항
 
-- **LLM proxy 의존성**: Chat Molder는 LLM proxy가 실행 중이어야 작동. 없으면 500 에러.
+- **로컬 LLM 프록시 의존성**: Chat Molder는 로컬 LLM 프록시가 실행 중이어야 작동. 없으면 500 에러.
 - **단일 사용자 전제**: API 인증 없음. localhost 전용.
 - **대용량 스킬 디렉토리**: 스킬 수 > 100이면 스캔 속도 저하 가능 (비동기 처리 미적용).
 - **브라우저 스크래퍼**: playwright 브라우저 미설치 시 Phase 4 실패. `playwright install chromium` 필요.
