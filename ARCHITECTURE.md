@@ -2,46 +2,30 @@
 
 ## 시스템 개요
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        브라우저 (localhost:5173)                  │
-│  ┌──────────────────────┐    ┌──────────────────────────────┐   │
-│  │   Sidebar (Inspector) │    │    Chat Molder (우측 패널)    │   │
-│  │  - 7개 섹션 카드       │    │  - 자연어 입력               │   │
-│  │  - 아이템 리스트        │    │  - diff 미리보기             │   │
-│  │  - 파일 에디터          │    │  - Apply / Rollback          │   │
-│  └──────────┬───────────┘    └───────────────┬──────────────┘   │
-└─────────────┼───────────────────────────────┼──────────────────┘
-              │  HTTP (fetch)                  │  HTTP (fetch)
-              ▼                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    FastAPI 백엔드 (localhost:8766)                │
-│                                                                 │
-│  GET  /api/scan          → HermesScanner.scan_all()            │
-│  GET  /api/scan/{section}→ HermesScanner + 타입 필터           │
-│  GET  /api/read          → Path.read_text()                    │
-│  POST /api/save          → backup + Path.write_text()          │
-│  POST /api/rollback      → .bak.* 복원                         │
-│  POST /api/mold          → OpenAI SDK → LLM proxy             │
-│  POST /api/web/scrape    → HybridScraper                       │
-│  GET  /api/env           → HERMES_HOME, is_sandbox, is_readonly│
-└──────────┬──────────────────────────────────────┬──────────────┘
-           │                                      │
-           ▼                                      ▼
-┌──────────────────────┐            ┌─────────────────────────────┐
-│   ~/.hermes (또는     │            │  LLM Proxy (localhost:20128) │
-│   $HERMES_HOME)      │            │  - 로컬 LLM 프록시           │
-│                      │            │  - 모델명: "model-name"       │
-│  skills/             │            │  - OpenAI API 호환           │
-│  memory/             │            └─────────────────────────────┘
-│  hooks/              │
-│  config.yaml         │            ┌─────────────────────────────┐
-│  AGENTS.md           │            │  Web Scraper 파이프라인       │
-└──────────────────────┘            │  Phase 1: Firecrawl API      │
-                                    │  Phase 2: Jina Reader API    │
-                                    │  Phase 3: TLS (curl_cffi)    │
-                                    │  Phase 4: Playwright 브라우저 │
-                                    └─────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Browser["브라우저 (localhost:5173)"]
+        direction LR
+        L["좌측 패널<br/>(섹션 카드, 아이템 상세, 에디터)"]
+        R["Chat Molder 우측 패널<br/>(자연어 입력, diff 미리보기, Apply)"]
+    end
+
+    subgraph Backend["FastAPI 백엔드 (localhost:8766)"]
+        API["API 라우터<br/>(/api/scan, /api/save, /api/mold 등)"]
+    end
+    
+    subgraph LocalEnv["로컬 환경"]
+        Hermes["~/.hermes<br/>(또는 HERMES_HOME)"]
+        LLM["LLM proxy (localhost:20128)<br/>모델: harness-model"]
+        Scraper["하이브리드 웹 스크래퍼<br/>(Firecrawl, Jina, TLS, Playwright)"]
+    end
+
+    L -->|HTTP Fetch| API
+    R -->|HTTP Fetch| API
+    
+    API -->|파일 읽기/쓰기/스캔| Hermes
+    API -->|OpenAI SDK| LLM
+    API -->|웹 스크래핑 요청| Scraper
 ```
 
 ---

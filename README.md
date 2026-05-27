@@ -138,58 +138,41 @@ Claude Code Skill을 Hermes Skill로 변환/주입합니다.
 
 ## 아키텍처
 
+```mermaid
+graph TD
+    subgraph Browser["브라우저 (localhost:5173)"]
+        direction LR
+        L["좌측 패널<br/>(섹션 카드, 아이템 상세, 에디터)"]
+        R["Chat Molder 우측 패널<br/>(자연어 입력, diff 미리보기, Apply)"]
+    end
+
+    subgraph Backend["FastAPI 백엔드 (localhost:8766)"]
+        API["API 라우터<br/>(/api/scan, /api/save, /api/mold 등)"]
+    end
+    
+    subgraph LocalEnv["로컬 환경"]
+        Hermes["~/.hermes<br/>(또는 HERMES_HOME)"]
+        LLM["LLM proxy (localhost:20128)<br/>모델: harness-model"]
+        Scraper["하이브리드 웹 스크래퍼<br/>(Firecrawl, Jina, TLS, Playwright)"]
+    end
+
+    L -->|HTTP Fetch| API
+    R -->|HTTP Fetch| API
+    
+    API -->|파일 읽기/쓰기/스캔| Hermes
+    API -->|OpenAI SDK| LLM
+    API -->|웹 스크래핑 요청| Scraper
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        브라우저 (localhost:5173)                  │
-│  ┌──────────────────────┐    ┌──────────────────────────────┐   │
-│  │   좌측 패널           │    │    Chat Molder (우측)          │   │
-│  │  - 섹션 카드          │    │  - 자연어 입력                │   │
-│  │  - 아이템 상세 목록    │    │  - diff 미리보기              │   │
-│  │  - 파일 에디터        │    │  - Apply / Rollback           │   │
-│  └──────────┬───────────┘    └───────────────┬──────────────┘   │
-└─────────────┼───────────────────────────────┼──────────────────┘
-              │  HTTP (fetch)                  │  HTTP (fetch)
-              ▼                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    FastAPI 백엔드 (localhost:8766)                │
-│                                                                 │
-│  GET  /api/scan          → workspace별 scanner.scan_all()      │
-│  GET  /api/scan/{section}→ scanner + 타입 필터                 │
-│  GET  /api/read          → Path.read_text()                    │
-│  POST /api/save          → 백업 + 쓰기 + git 커밋              │
-│  POST /api/rollback      → .bak.* 복원                         │
-│  POST /api/mold          → OpenAI SDK → LLM proxy / OpenAI     │
-│  POST /api/web/scrape    → HybridScraper (4단계)               │
-│  GET  /api/env           → HERMES_HOME, sandbox, readonly, git │
-│  POST /api/git/init      → git 초기화 + 첫 커밋               │
-│  GET  /api/git/log       → 커밋 이력                           │
-│  GET  /api/git/diff      → 커밋별 diff                         │
-│  POST /api/git/rollback  → 파일별 git 복원                     │
-│  GET  /api/audit/logs    → SQLite 감사 추적                    │
-│  POST /api/convert/skill → Hermes ↔ Claude Code 변환           │
-│  POST /api/convert/skill/inject → Claude Skill → Hermes 주입    │
-│  GET  /api/usage/stats   → Claude Skill/Subagent 사용량         │
-│  GET  /api/recommendations → Smart Diet 추천                   │
-│  GET  /api/agent-runners → Pi Agent Runner 감지                 │
-│  POST /api/pi/runs       → Pi read-only run                     │
-└──────────┬──────────────────────────────────────┬──────────────┘
-           │                                      │
-           ▼                                      ▼
-┌──────────────────────┐            ┌─────────────────────────────┐
-│   ~/.hermes           │            │  LLM proxy (localhost:20128)│
-│   (또는 $HERMES_HOME) │            │  - 로컬 LLM 프록시           │
-│                      │            │  - 모델명: "harness-model"   │
-│                      │            │  - OpenAI API 호환           │
-│  skill-bundles/      │            └─────────────────────────────┘
-│  memory/             │
-│  hooks/              │            ┌─────────────────────────────┐
-│  cron/               │            │  웹 스크래퍼 파이프라인       │
-│  plugins/            │            │  Phase 1: Firecrawl API      │
-│  config.yaml         │            │  Phase 2: Jina Reader API    │
-│  AGENTS.md           │            │  Phase 3: TLS (curl_cffi)    │
-│  SOUL.md             │            │  Phase 4: Playwright 브라우저 │
-└──────────────────────┘            └─────────────────────────────┘
-```
+
+### 주요 API 엔드포인트 흐름
+| 컴포넌트 | 엔드포인트 | 역할 |
+|----------|------------|------|
+| **스캐너** | `GET /api/scan` | workspace별 전체 하네스 스캔 |
+| **파일IO** | `GET /api/read`<br>`POST /api/save` | 파일 내용 읽기 / 백업+쓰기+git 커밋 |
+| **AI 챗** | `POST /api/mold` | OpenAI SDK → LLM proxy 호출 |
+| **Git** | `POST /api/git/*` | init, log, diff, rollback 처리 |
+| **변환기** | `POST /api/convert/*` | Claude Code ↔ Hermes 스킬 변환 및 주입 |
+| **Runner**| `POST /api/pi/runs` | Pi Agent read-only 실행 |
 
 ---
 

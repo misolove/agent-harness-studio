@@ -100,53 +100,41 @@ Restore from the most recent `.bak.*` backup with one click.
 
 ## Architecture
 
+```mermaid
+graph TD
+    subgraph Browser["Browser (localhost:5173)"]
+        direction LR
+        L["Left Panel<br/>(Section Cards, Items, Editor)"]
+        R["Chat Molder Right Panel<br/>(Natural Language, diff preview, Apply)"]
+    end
+
+    subgraph Backend["FastAPI Backend (localhost:8766)"]
+        API["API Router<br/>(/api/scan, /api/save, /api/mold, etc.)"]
+    end
+    
+    subgraph LocalEnv["Local Environment"]
+        Hermes["~/.hermes<br/>(or HERMES_HOME)"]
+        LLM["LLM proxy (localhost:20128)<br/>Model: your-model"]
+        Scraper["Hybrid Web Scraper<br/>(Firecrawl, Jina, TLS, Playwright)"]
+    end
+
+    L -->|HTTP Fetch| API
+    R -->|HTTP Fetch| API
+    
+    API -->|Read/Write/Scan| Hermes
+    API -->|OpenAI SDK| LLM
+    API -->|Web Scrape Request| Scraper
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Browser (localhost:5173)                  │
-│  ┌──────────────────────┐    ┌──────────────────────────────┐   │
-│  │   Left Panel          │    │    Chat Molder (Right)        │   │
-│  │  - Section cards      │    │  - Natural language input     │   │
-│  │  - Item detail list   │    │  - Diff preview               │   │
-│  │  - File editor        │    │  - Apply / Rollback           │   │
-│  └──────────┬───────────┘    └───────────────┬──────────────┘   │
-└─────────────┼───────────────────────────────┼──────────────────┘
-              │  HTTP (fetch)                  │  HTTP (fetch)
-              ▼                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    FastAPI Backend (localhost:8766)               │
-│                                                                 │
-│  GET  /api/scan          → HermesScanner.scan_all()            │
-│  GET  /api/scan/{section}→ HermesScanner + type filter         │
-│  GET  /api/read          → Path.read_text()                    │
-│  POST /api/save          → backup + write + git commit         │
-│  POST /api/rollback      → .bak.* restore                      │
-│  POST /api/mold          → OpenAI SDK → LLM proxy/OpenAI         │
-│  POST /api/web/scrape    → HybridScraper (4-phase)             │
-│  GET  /api/env           → HERMES_HOME, sandbox, readonly, git │
-│  POST /api/git/init      → git init + initial commit           │
-│  GET  /api/git/log       → commit history                      │
-│  GET  /api/git/diff      → per-commit diff                     │
-│  POST /api/git/rollback  → per-file git restore                │
-│  GET  /api/audit/logs    → SQLite audit trail                  │
-│  POST /api/convert/skill → Hermes ↔ Claude Code conversion     │
-└──────────┬──────────────────────────────────────┬──────────────┘
-           │                                      │
-           ▼                                      ▼
-┌──────────────────────┐            ┌─────────────────────────────┐
-│   ~/.hermes           │            │  LLM proxy (localhost:20128)   │
-│   (or $HERMES_HOME)  │            │  - Local LLM proxy           │
-│                      │            │  - Model: "your-model"          │
-│  skills/             │            │  - OpenAI API compatible     │
-│  skill-bundles/      │            └─────────────────────────────┘
-│  memory/             │
-│  hooks/              │            ┌─────────────────────────────┐
-│  cron/               │            │  Web Scraper Pipeline        │
-│  plugins/            │            │  Phase 1: Firecrawl API      │
-│  config.yaml         │            │  Phase 2: Jina Reader API    │
-│  AGENTS.md           │            │  Phase 3: TLS (curl_cffi)    │
-│  SOUL.md             │            │  Phase 4: Playwright Browser │
-└──────────────────────┘            └─────────────────────────────┘
-```
+
+### Main API Endpoints Flow
+| Component | Endpoint | Role |
+|-----------|----------|------|
+| **Scanner** | `GET /api/scan` | Full harness scan by workspace |
+| **File I/O** | `GET /api/read`<br>`POST /api/save` | Read content / Auto-backup + Write + Git commit |
+| **AI Chat** | `POST /api/mold` | Call LLM proxy via OpenAI SDK |
+| **Git** | `POST /api/git/*` | Init, log, diff, rollback handling |
+| **Converter** | `POST /api/convert/*` | Claude Code ↔ Hermes skill conversion and injection |
+| **Runner**| `POST /api/pi/runs` | Pi Agent read-only execution |
 
 ---
 
