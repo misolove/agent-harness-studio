@@ -438,6 +438,7 @@ OPENAI_API_KEY=sk-...
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 시스템 아키텍처, 데이터 흐름, 컴포넌트 설명 |
 | [HANDOFF.md](HANDOFF.md) | 개발 핸드오프 노트 |
 | [docs/api.md](docs/api.md) | 전체 API 엔드포인트 레퍼런스 |
+| [docs/hermes-reference-v0.14.md](docs/hermes-reference-v0.14.md) | **[중요]** Hermes Agent v0.14.0 핵심 아키텍처 및 철학 요약 가이드 |
 | [docs/agent-runner-pi.md](docs/agent-runner-pi.md) | Pi Coding Agent adapter 설계/구현 상태 |
 | [docs/usage-telemetry-spec.md](docs/usage-telemetry-spec.md) | Usage Telemetry A안 구현 스펙 |
 | [docs/product-assessment-and-skill-converter.md](docs/product-assessment-and-skill-converter.md) | 제품성 평가와 Skill Converter 구현/API |

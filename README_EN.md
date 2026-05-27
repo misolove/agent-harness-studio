@@ -361,7 +361,8 @@ Please open an issue first to discuss what you'd like to change.
 | [AGENTS.md](AGENTS.md) | Agent handoff — current state, known issues, extension points |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture, data flow, component details |
 | [HANDOFF.md](HANDOFF.md) | Development handoff notes |
-| [docs/api.md](docs/api.md) | Complete API endpoint reference |
+| [docs/api.md](docs/api.md) | Full API Endpoint Reference |
+| [docs/hermes-reference-v0.14.md](docs/hermes-reference-v0.14.md) | **[Important]** Hermes Agent v0.14.0 core architecture and philosophy |
 | [docs/prd.md](docs/prd.md) | Product Requirements Document |
 | [docs/git-safety.md](docs/git-safety.md) | Git integration safety guide |
 | [docs/1pager.md](docs/1pager.md) | Project background and goals |
