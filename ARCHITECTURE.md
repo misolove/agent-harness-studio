@@ -22,16 +22,16 @@
 │  GET  /api/read          → Path.read_text()                    │
 │  POST /api/save          → backup + Path.write_text()          │
 │  POST /api/rollback      → .bak.* 복원                         │
-│  POST /api/mold          → OpenAI SDK → 9router               │
+│  POST /api/mold          → OpenAI SDK → LLM proxy             │
 │  POST /api/web/scrape    → HybridScraper                       │
 │  GET  /api/env           → HERMES_HOME, is_sandbox, is_readonly│
 └──────────┬──────────────────────────────────────┬──────────────┘
            │                                      │
            ▼                                      ▼
 ┌──────────────────────┐            ┌─────────────────────────────┐
-│   ~/.hermes (또는     │            │  9router (localhost:20128)   │
+│   ~/.hermes (또는     │            │  LLM Proxy (localhost:20128) │
 │   $HERMES_HOME)      │            │  - 로컬 LLM 프록시           │
-│                      │            │  - 모델명: "letitbe"          │
+│                      │            │  - 모델명: "model-name"       │
 │  skills/             │            │  - OpenAI API 호환           │
 │  memory/             │            └─────────────────────────────┘
 │  hooks/              │
@@ -106,7 +106,7 @@ user[N]: [{context_str}]\n\n{current_prompt}
 응답은 항상 JSON: `{"action": "CHAT|CREATE_SKILL|UPDATE_SKILL|...", "message": "...", ...}`
 
 **LLM 클라이언트:**
-`get_llm_client()` — `~/.hermes/config.yaml`에서 base_url 읽기 시도, 없으면 `http://127.0.0.1:20128/v1` 기본값.
+※ `http://localhost:20128/v1` — LLM proxy 기본값.
 
 **`normalize_skill_content()`:**
 LLM이 생성한 SKILL.md의 frontmatter 스키마 오류를 자동 수리:
@@ -202,7 +202,7 @@ Phase 4: Playwright 브라우저 자동화
 | `HERMES_HOME` | `~/.hermes` | 스캔 대상 디렉토리 |
 | `HARNESS_READONLY` | `0` | `1`이면 모든 쓰기 차단 |
 | `FIRECRAWL_API_KEY` | (없음) | Firecrawl Phase 1 활성화 |
-| `OPENAI_API_KEY` | (없음) | 9router 대체 (미구현, 향후) |
+| `OPENAI_API_KEY` | (없음) | LLM proxy 대체 (미구현, 향후) |
 
 ---
 
@@ -212,7 +212,7 @@ Phase 4: Playwright 브라우저 자동화
 fastapi          # HTTP 프레임워크
 uvicorn          # ASGI 서버
 pyyaml           # config.yaml 파싱
-openai           # LLM 클라이언트 (9router 호환)
+openai           # LLM 클라이언트 (LLM proxy 호환)
 python-dotenv    # .env 로드
 httpx            # async HTTP (Jina 스크래퍼)
 firecrawl-py     # Phase 1 스크래퍼

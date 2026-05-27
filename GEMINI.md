@@ -32,7 +32,7 @@ requirements.txt
 .venv/
 node_modules/
 run.sh                   ← LaunchAgent 실행 스크립트, 수정 시 서비스 중단
-~/Library/LaunchAgents/com.letitbe.agent-harness-studio.plist
+~/Library/LaunchAgents/com.user.agent-harness-studio.plist
 ```
 
 ## 검증 명령 (완료 선언 전 실행)
@@ -48,7 +48,7 @@ cd src/ui && npm run build
 python -m src.scanner.hermes_scanner | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d), 'items')"
 
 # API 헬스 체크 (서비스 실행 중일 때)
-curl -sf http://127.0.0.1:8766/api/scan | python3 -c "import json,sys; print(json.load(sys.stdin)['summary'])"
+curl -sf http://localhost:8766/api/scan | python3 -c "import json,sys; print(json.load(sys.stdin)['summary'])"
 ```
 
 ## 완료 보고 형식

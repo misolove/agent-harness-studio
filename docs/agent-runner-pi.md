@@ -207,10 +207,10 @@ Current smoke checks:
 ```bash
 python3 -m py_compile src/server/app.py
 cd src/ui && npm run build
-curl -sf 'http://127.0.0.1:8766/api/pi/status?workspace=/Users/letitbe/letitbe/agent-harness-studio' | python3 -m json.tool
-curl -sf -X POST 'http://127.0.0.1:8766/api/pi/preview' \
+curl -sf 'http://localhost:8766/api/pi/status?workspace=~/agent-harness-studio' | python3 -m json.tool
+curl -sf -X POST 'http://localhost:8766/api/pi/preview' \
   -H 'Content-Type: application/json' \
-  -d '{"workspace":"/Users/letitbe/letitbe/agent-harness-studio","mode":"rpc","prompt":"hello"}' \
+  -d '{"workspace":"~/agent-harness-studio","mode":"rpc","prompt":"hello"}' \
   | python3 -m json.tool
 ```
 

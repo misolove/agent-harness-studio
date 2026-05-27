@@ -76,7 +76,7 @@ MVP는 단순 Hermes inspector를 넘어 **local agent ops console** 성격으�
 최근 검증값:
 - Claude Code Smart 추천: 263개 (`HIGH_VALUE:1`, `STALE_UNUSED:72`, `ARCHIVE:190`)
 - Cursor 등 미지원 telemetry workspace: unsupported + 빈 추천 리스트로 graceful degrade
-- Skill Converter dry-run: `agency-client-interview` → `/Users/letitbe/.hermes/skills/agency-client-interview/SKILL.md`
+- Skill Converter dry-run: `agency-client-interview` → `~/.hermes/skills/agency-client-interview/SKILL.md`
 - `python3 -m py_compile src/server/app.py`
 - `cd src/ui && npm run build`
 

@@ -39,7 +39,7 @@ for PORT in 8766 5173; do
 done
 
 # ── Start Backend ──────────────────────────
-echo "[$(date)] 🚀 Starting Backend on http://127.0.0.1:8766 (HERMES_HOME=$HARNESS_HOME)"
+echo "[$(date)] 🚀 Starting Backend on http://localhost:8766 (HERMES_HOME=$HARNESS_HOME)"
 cd "$PROJECT_ROOT"
 HERMES_HOME="$HARNESS_HOME" \
 HARNESS_READONLY="${HARNESS_READONLY:-0}" \
@@ -59,7 +59,7 @@ FRONTEND_PID=$!
 sleep 6
 HEALTH_OK=true
 
-if curl -sf http://127.0.0.1:8766/docs -o /dev/null 2>/dev/null; then
+if curl -sf http://localhost:8766/docs -o /dev/null 2>/dev/null; then
   echo "[$(date)] ✅ Backend healthy"
 else
   echo "[$(date)] ⚠️  Backend not responding yet"

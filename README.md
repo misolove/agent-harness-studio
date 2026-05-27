@@ -131,7 +131,7 @@ Claude Code Skill을 Hermes Skill로 변환/주입합니다.
 | 백엔드 | FastAPI (Python 3.13+) + uvicorn | 8766 |
 | 프론트엔드 | React + Vite | 5173 |
 | 스캐너 | Hermes/Claude/Cursor/Codex/OpenClaw/Gemini/Antigravity/Studio scanners | — |
-| LLM | 9router 로컬 프록시 (`model: letitbe`) → OpenAI API 폴백 | 20128 |
+| LLM | LLM proxy 로컬 프록시 → OpenAI API 폴백 | 20128 |
 | 데이터 소스 | `~/.hermes`, `~/.claude`, `~/.cursor`, `~/.codex`, `~/.openclaw`, `~/.gemini`, Studio repo | — |
 
 ---
@@ -158,7 +158,7 @@ Claude Code Skill을 Hermes Skill로 변환/주입합니다.
 │  GET  /api/read          → Path.read_text()                    │
 │  POST /api/save          → 백업 + 쓰기 + git 커밋              │
 │  POST /api/rollback      → .bak.* 복원                         │
-│  POST /api/mold          → OpenAI SDK → 9router/OpenAI         │
+│  POST /api/mold          → OpenAI SDK → LLM proxy / OpenAI         │
 │  POST /api/web/scrape    → HybridScraper (4단계)               │
 │  GET  /api/env           → HERMES_HOME, sandbox, readonly, git │
 │  POST /api/git/init      → git 초기화 + 첫 커밋               │
@@ -176,10 +176,9 @@ Claude Code Skill을 Hermes Skill로 변환/주입합니다.
            │                                      │
            ▼                                      ▼
 ┌──────────────────────┐            ┌─────────────────────────────┐
-│   ~/.hermes           │            │  9router (localhost:20128)   │
+│   ~/.hermes           │            │  LLM proxy (localhost:20128)   │
 │   (또는 $HERMES_HOME) │            │  - 로컬 LLM 프록시           │
-│                      │            │  - 모델명: "letitbe"          │
-│  skills/             │            │  - OpenAI API 호환           │
+│                      │            │  - OpenAI API 호환           │
 │  skill-bundles/      │            └─────────────────────────────┘
 │  memory/             │
 │  hooks/              │            ┌─────────────────────────────┐
@@ -198,7 +197,7 @@ Claude Code Skill을 Hermes Skill로 변환/주입합니다.
 ### 사전 요구사항
 - Python 3.13+
 - Node.js & npm
-- (선택) 9router 로컬 프록시 포트 20128, 또는 `OPENAI_API_KEY`
+- (선택) LLM proxy on port 20128, 또는 `OPENAI_API_KEY`
 
 ### 설치
 
@@ -260,7 +259,7 @@ cd src/ui && npx vite
 |------|--------|------|
 | `HERMES_HOME` | `~/.hermes` | 스캔할 하네스 디렉토리. `~/.hermes/sandbox`로 설정 시 실데이터와 분리 |
 | `HARNESS_READONLY` | `0` | `1`로 설정 시 모든 쓰기 API 차단 |
-| `OPENAI_API_KEY` | (없음) | 9router 미사용 시 OpenAI API 폴백 |
+| `OPENAI_API_KEY` | (없음) | LLM proxy 미사용 시 OpenAI API 폴백 |
 | `FIRECRAWL_API_KEY` | (없음) | Firecrawl Phase 1 웹 스크래퍼 활성화 |
 
 ---
@@ -388,7 +387,7 @@ agent-harness-studio/
 fastapi>=0.111.0           # HTTP 프레임워크
 uvicorn[standard]>=0.30.0  # ASGI 서버
 PyYAML>=6.0.0              # YAML 파싱
-openai>=1.0.0              # LLM 클라이언트 (9router/OpenAI 호환)
+openai>=1.0.0              # LLM 클라이언트 (LLM proxy / OpenAI 호환)
 firecrawl-py>=1.0.0        # Phase 1 웹 스크래퍼
 python-dotenv>=1.0.0       # .env 로드
 httpx>=0.27.0              # async HTTP (Jina 스크래퍼)
@@ -403,7 +402,7 @@ markdownify>=0.12.0        # HTML → Markdown 변환
 
 Chat Molder는 기본적으로 로컬 LLM 프록시를 사용하며 자동 폴백을 지원합니다:
 
-1. **기본**: 9router (`http://127.0.0.1:20128/v1`, 모델: `letitbe`)
+1. **기본**: LLM proxy (`http://localhost:20128/v1`)
 2. **폴백**: OpenAI API (모델: `gpt-4o`) — `OPENAI_API_KEY` 설정 시
 3. **설정 오버라이드**: `~/.hermes/config.yaml`에서 커스텀 `base_url` 지정 가능
 
@@ -418,7 +417,7 @@ OPENAI_API_KEY=sk-...
 
 ## 알려진 제약사항
 
-- **9router 의존성**: Chat Molder는 9router 또는 OpenAI API 키가 필요합니다. 둘 다 없으면 `/api/mold`에서 500 에러 발생.
+- **LLM proxy 의존성**: Chat Molder는 LLM proxy 또는 OpenAI API 키가 필요합니다. 둘 다 없으면 `/api/mold`에서 500 에러 발생.
 - **단일 사용자**: API 인증 없음. localhost 전용.
 - **대용량 스킬 디렉토리**: 스킬 수 >100개 시 스캔 속도 저하 가능 (동기 처리).
 - **브라우저 스크래퍼**: Phase 4 사용 시 `playwright install chromium` 필요.
@@ -467,4 +466,4 @@ OPENAI_API_KEY=sk-...
 
 ## 라이선스
 
-MIT © [letitbe](https://github.com/misolove)
+MIT © [your-name](https://github.com/misolove)

@@ -20,8 +20,8 @@
 - `src/ui/src/App.jsx`, `src/ui/src/App.css` — Diet 모달 Smart 탭, 추천 배지, 추천/일괄 아카이브 UI
 
 검증 결과:
-- `/api/recommendations?workspace=/Users/letitbe/.claude&days=30` → 263개 추천, `HIGH_VALUE:1`, `STALE_UNUSED:72`, `ARCHIVE:190`
-- `/api/recommendations?workspace=/Users/letitbe/.cursor&days=30` → unsupported + 빈 추천 리스트
+- `/api/recommendations?workspace=~/.claude&days=30` → 263개 추천, `HIGH_VALUE:1`, `STALE_UNUSED:72`, `ARCHIVE:190`
+- `/api/recommendations?workspace=~/.cursor&days=30` → unsupported + 빈 추천 리스트
 - 임시 파일로 `/api/actions/archive` 스모크 테스트 완료: 원본 이동 + archive 경로 생성 확인
 - `python3 -m py_compile src/server/app.py src/server/usage_tracker.py src/server/recommender.py src/scanner/claude_scanner.py`
 - `cd src/ui && npm run build`
@@ -55,8 +55,8 @@
 - `_convert_skill_content()` 단독 테스트: `allowed-tools` → `metadata.hermes.requires_tools`
 - `/api/convert/skill` smoke test 통과
 - `/api/convert/skill/inject` dry-run smoke test:
-  - source: `/Users/letitbe/.claude/skills/agency-client-interview/SKILL.md`
-  - target: `/Users/letitbe/.hermes/skills/agency-client-interview/SKILL.md`
+  - source: `~/.claude/skills/agency-client-interview/SKILL.md`
+  - target: `~/.hermes/skills/agency-client-interview/SKILL.md`
   - 실제 파일 쓰기 없음
 
 ---
@@ -103,7 +103,7 @@
 ```bash
 cd ~/agent-harness-studio
 source .venv/bin/activate
-# LaunchAgent로 자동 실행됨 (com.letitbe.agent-harness-studio)
+# LaunchAgent로 자동 실행됨 (com.user.agent-harness-studio)
 # 수동 실행: ./run.sh
 ```
 
@@ -118,7 +118,7 @@ source .venv/bin/activate
 - `docs/agent-runner-pi.md` — Pi Coding Agent adapter 설계/핸드오프
 - `docs/product-assessment-and-skill-converter.md` — 제품성 평가 + Skill Converter 설계/구현 상태
 - `docs/usage-telemetry-spec.md` — Usage Telemetry A안 구현 스펙
-- `~/Library/LaunchAgents/com.letitbe.agent-harness-studio.plist` — macOS LaunchAgent
+- `~/Library/LaunchAgents/com.user.agent-harness-studio.plist` — macOS LaunchAgent
 
 ---
 
@@ -409,7 +409,7 @@ print(Counter(x['type'] for x in d))
 "
 
 # API 헬스 체크
-curl -sf http://127.0.0.1:8766/api/scan | python3 -m json.tool | grep summary
+curl -sf http://localhost:8766/api/scan | python3 -m json.tool | grep summary
 
 # 프론트엔드
 open http://localhost:5173

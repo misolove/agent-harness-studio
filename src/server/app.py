@@ -248,7 +248,7 @@ app.add_middleware(
 def get_llm_provider_config() -> Dict[str, Any]:
     """Return the effective Chat Molder LLM provider without exposing secrets."""
     base_url = os.environ.get("LLM_BASE_URL")
-    model = os.environ.get("LLM_MODEL", "letitbe")
+    model = os.environ.get("LLM_MODEL", "harness-model")
     if base_url:
         return {
             "provider": os.environ.get("LLM_PROVIDER_NAME", "Custom"),
@@ -290,16 +290,16 @@ def get_llm_provider_config() -> Dict[str, Any]:
         }
 
     return {
-        "provider": "9router",
+        "provider": "llm-proxy",
         "source": "default",
-        "base_url": "http://127.0.0.1:20128/v1",
+        "base_url": "http://localhost:20128/v1",
         "model": model,
         "api_key_set": False,
         "editable": True,
     }
 
 
-# Initialize OpenAI client for 9router (with fallback to OpenAI API)
+# Initialize OpenAI client for LLM proxy (with fallback to OpenAI API)
 def get_llm_client():
     config = get_llm_provider_config()
     api_key = os.environ.get("LLM_API_KEY") or os.environ.get("OPENAI_API_KEY") or "dummy"
@@ -318,7 +318,7 @@ def update_llm_provider(config: Dict[str, Any] = Body(...)):
     """Persist Chat Molder LLM provider settings to project .env and apply immediately."""
     provider = str(config.get("provider") or "Custom").strip()
     base_url = str(config.get("base_url") or "").strip()
-    model = str(config.get("model") or "letitbe").strip()
+    model = str(config.get("model") or "harness-model").strip()
     api_key = config.get("api_key")
 
     if not model:

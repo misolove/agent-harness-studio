@@ -1,7 +1,7 @@
 model:
-  default: letitbe
-  provider: custom
-  base_url: http://127.0.0.1:20128/v1
+  default: your-model
+  provider: your-provider
+  base_url: http://localhost:20128/v1
 providers: {}
 fallback_providers: []
 credential_pool_strategies: {}
@@ -643,7 +643,7 @@ mcp_servers:
     - apps/daemon/dist/cli.js
     - mcp
     - --daemon-url
-    - http://127.0.0.1:7456
+    - http://localhost:7456
     timeout: 60
     connect_timeout: 15
 platform_toolsets:

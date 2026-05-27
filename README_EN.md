@@ -93,7 +93,7 @@ Restore from the most recent `.bak.*` backup with one click.
 | Backend | FastAPI (Python 3.13+) + uvicorn | 8766 |
 | Frontend | React + Vite | 5173 |
 | Scanner | Custom HermesScanner | — |
-| LLM | 9router local proxy (`model: letitbe`) → OpenAI API fallback | 20128 |
+| LLM | LLM proxy (`model: your-model`) → OpenAI API fallback | 20128 |
 | Data Source | `~/.hermes` directory | — |
 
 ---
@@ -120,7 +120,7 @@ Restore from the most recent `.bak.*` backup with one click.
 │  GET  /api/read          → Path.read_text()                    │
 │  POST /api/save          → backup + write + git commit         │
 │  POST /api/rollback      → .bak.* restore                      │
-│  POST /api/mold          → OpenAI SDK → 9router/OpenAI         │
+│  POST /api/mold          → OpenAI SDK → LLM proxy/OpenAI         │
 │  POST /api/web/scrape    → HybridScraper (4-phase)             │
 │  GET  /api/env           → HERMES_HOME, sandbox, readonly, git │
 │  POST /api/git/init      → git init + initial commit           │
@@ -133,9 +133,9 @@ Restore from the most recent `.bak.*` backup with one click.
            │                                      │
            ▼                                      ▼
 ┌──────────────────────┐            ┌─────────────────────────────┐
-│   ~/.hermes           │            │  9router (localhost:20128)   │
+│   ~/.hermes           │            │  LLM proxy (localhost:20128)   │
 │   (or $HERMES_HOME)  │            │  - Local LLM proxy           │
-│                      │            │  - Model: "letitbe"          │
+│                      │            │  - Model: "your-model"          │
 │  skills/             │            │  - OpenAI API compatible     │
 │  skill-bundles/      │            └─────────────────────────────┘
 │  memory/             │
@@ -155,7 +155,7 @@ Restore from the most recent `.bak.*` backup with one click.
 ### Prerequisites
 - Python 3.13+
 - Node.js & npm
-- (Optional) 9router local proxy on port 20128, or an `OPENAI_API_KEY`
+- (Optional) LLM proxy on port 20128, or an `OPENAI_API_KEY`
 
 ### Installation
 
@@ -217,7 +217,7 @@ cd src/ui && npx vite
 |----------|---------|-------------|
 | `HERMES_HOME` | `~/.hermes` | Harness directory to scan. Set to `~/.hermes/sandbox` for isolation |
 | `HARNESS_READONLY` | `0` | Set to `1` to block all write APIs |
-| `OPENAI_API_KEY` | (none) | Fallback LLM when 9router is unavailable |
+| `OPENAI_API_KEY` | (none) | Fallback LLM when LLM proxy is unavailable |
 | `FIRECRAWL_API_KEY` | (none) | Enables Firecrawl as Phase 1 web scraper |
 
 ---
@@ -308,7 +308,7 @@ agent-harness-studio/
 fastapi>=0.111.0        # HTTP framework
 uvicorn[standard]>=0.30.0  # ASGI server
 PyYAML>=6.0.0           # YAML parsing
-openai>=1.0.0           # LLM client (9router/OpenAI compatible)
+openai>=1.0.0           # LLM client (LLM proxy / OpenAI compatible)
 firecrawl-py>=1.0.0     # Phase 1 web scraper
 python-dotenv>=1.0.0    # .env loading
 httpx>=0.27.0           # Async HTTP (Jina scraper)
@@ -323,7 +323,7 @@ markdownify>=0.12.0     # HTML → Markdown conversion
 
 Chat Molder uses a local LLM proxy by default, with automatic fallback:
 
-1. **Primary**: 9router at `http://127.0.0.1:20128/v1` (model: `letitbe`)
+1. **Primary**: LLM proxy at `http://localhost:20128/v1` (model: `your-model`)
 2. **Fallback**: OpenAI API (model: `gpt-4o`) if `OPENAI_API_KEY` is set
 3. **Config override**: `~/.hermes/config.yaml` can specify custom `base_url`
 
@@ -338,7 +338,7 @@ OPENAI_API_KEY=sk-...
 
 ## Known Limitations
 
-- **9router dependency**: Chat Molder requires 9router or an OpenAI API key. Without either, the `/api/mold` endpoint returns 500.
+- **LLM proxy dependency**: Chat Molder requires an LLM proxy or an OpenAI API key. Without either, the `/api/mold` endpoint returns 500.
 - **Single-user**: No authentication. Intended for localhost use only.
 - **Large skill directories**: Scanning >100 skills may be slow (synchronous processing).
 - **Browser scraper**: Requires `playwright install chromium` for Phase 4.
@@ -383,4 +383,4 @@ Please open an issue first to discuss what you'd like to change.
 
 ## License
 
-MIT © [letitbe](https://github.com/misolove)
+MIT © [your-name](https://github.com/misolove)

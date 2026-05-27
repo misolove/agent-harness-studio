@@ -126,8 +126,8 @@ Body:
 
 ```json
 {
-  "source_path": "/Users/letitbe/.claude/skills/agency-client-interview/SKILL.md",
-  "target_workspace": "/Users/letitbe/.hermes",
+  "source_path": "~/.claude/skills/agency-client-interview/SKILL.md",
+  "target_workspace": "~/.hermes",
   "source_agent": "claude-code",
   "overwrite": false,
   "dry_run": false
@@ -144,13 +144,13 @@ Behavior:
 Smoke test used:
 
 ```bash
-curl -sf -X POST 'http://127.0.0.1:8766/api/convert/skill/inject' \
+curl -sf -X POST 'http://localhost:8766/api/convert/skill/inject' \
   -H 'Content-Type: application/json' \
-  -d '{"source_path":"/Users/letitbe/.claude/skills/agency-client-interview/SKILL.md","target_workspace":"/Users/letitbe/.hermes","source_agent":"claude-code","dry_run":true}'
+  -d '{"source_path":"~/.claude/skills/agency-client-interview/SKILL.md","target_workspace":"~/.hermes","source_agent":"claude-code","dry_run":true}'
 ```
 
 Expected result:
 - `status: "dry_run"`
 - `skill_name: "agency-client-interview"`
-- `path: "/Users/letitbe/.hermes/skills/agency-client-interview/SKILL.md"`
+- `path: "~/.hermes/skills/agency-client-interview/SKILL.md"`
 

@@ -18,7 +18,7 @@
 2. **추천 엔진**에서 "0번 호출 + 토큰 큼" 같은 휴리스틱으로 점수 매김
 3. **🥗 Diet 모달에 "📊 Smart" 탭**을 추가해서 추천 리스트 + 일괄 아카이브 버튼
 
-검증 결과: Claude workspace 기준 `/api/recommendations?workspace=/Users/letitbe/.claude&days=30`에서 263개 추천(`HIGH_VALUE:1`, `STALE_UNUSED:72`, `ARCHIVE:190`)을 반환했다.
+검증 결과: Claude workspace 기준 `/api/recommendations?workspace=~/.claude&days=30`에서 263개 추천(`HIGH_VALUE:1`, `STALE_UNUSED:72`, `ARCHIVE:190`)을 반환했다.
 
 ---
 
@@ -54,7 +54,7 @@ Agent session log parser.
 각 에이전트의 세션 로그에서 Skill/Subagent invocation을 카운트한다.
 
 지원 에이전트:
-- Claude Code: ~/.claude/projects/*/*.jsonl  (tool_use 이벤트 파싱)
+- Claude Code: ~/.claude/projects/*.jsonl  (tool_use 이벤트 파싱)
 - Codex: ~/.codex/history.jsonl  (세션 카운트만, tool 추적 없음)
 - Cursor: ~/.cursor/projects/  (조사 필요 — 일단 미지원)
 
@@ -71,7 +71,7 @@ from typing import Dict, List, Any, Optional
 
 def parse_claude_sessions(days: int = 30) -> Dict[str, Dict[str, Any]]:
     """
-    ~/.claude/projects/-Users-letitbe/*.jsonl 파싱.
+    ~/.claude/projects/*.jsonl 파싱.
     
     Returns:
         {
@@ -504,7 +504,7 @@ useEffect(() => {
 
 ### 3-1. Claude Code 로그 — **파싱 가능 ✓**
 
-**경로**: `~/.claude/projects/-Users-letitbe/*.jsonl`
+**경로**: `~/.claude/projects/*.jsonl`
 
 **Skill invocation 예시:**
 ```json
@@ -574,7 +574,7 @@ useEffect(() => {
 ### 4-1. 백엔드 단위 테스트
 
 ```bash
-cd /Users/letitbe/letitbe/agent-harness-studio
+cd ~/agent-harness-studio
 source .venv/bin/activate
 python3 -c "
 from src.server.usage_tracker import parse_claude_sessions
@@ -598,10 +598,10 @@ for name, stats in sorted(result['agents'].items(), key=lambda x: -x[1]['count']
 
 ```bash
 # Usage stats
-curl -s 'http://localhost:8766/api/usage/stats?workspace=/Users/letitbe/.claude&days=30' | python3 -m json.tool | head -30
+curl -s 'http://localhost:8766/api/usage/stats?workspace=~/.claude&days=30' | python3 -m json.tool | head -30
 
 # Recommendations
-curl -s 'http://localhost:8766/api/recommendations?workspace=/Users/letitbe/.claude&days=30' \
+curl -s 'http://localhost:8766/api/recommendations?workspace=~/.claude&days=30' \
   | python3 -m json.tool | head -50
 ```
 
@@ -629,7 +629,7 @@ curl -s 'http://localhost:8766/api/recommendations?workspace=/Users/letitbe/.cla
 
 → **`claude_scanner.py` 수정 필요할 수 있음**. 먼저 다음을 확인:
 ```bash
-curl -s 'http://localhost:8766/api/scan?workspace=/Users/letitbe/.claude' \
+curl -s 'http://localhost:8766/api/scan?workspace=~/.claude' \
   | python3 -c "import sys, json; d=json.load(sys.stdin); 
     skills = [i for i in d['items'] if i['type']=='Skill'][:3]
     print(json.dumps(skills, indent=2))"
@@ -646,7 +646,7 @@ Claude jsonl의 timestamp는 UTC ISO 8601 (Z 접미사). Python `fromisoformat()
 
 ### 5-4. 워크스페이스 ID vs path
 
-`/api/scan?workspace=` 는 path를 받음 (예: `/Users/letitbe/.claude`). `usage_tracker.get_usage_summary(workspace)`도 path를 받음. **id (`"claude"`)와 path를 헷갈리지 말 것.**
+`/api/scan?workspace=` 는 path를 받음 (예: `~/.claude`). `usage_tracker.get_usage_summary(workspace)`도 path를 받음. **id (`"claude"`)와 path를 헷갈리지 말 것.**
 
 → frontend의 `activeWorkspace` 상태가 path를 들고 있는지 id를 들고 있는지 `App.jsx`에서 확인. 둘 다 케이스를 본 적 있음.
 

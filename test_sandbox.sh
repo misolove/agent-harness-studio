@@ -13,14 +13,14 @@ REAL_HERMES="$HOME/.hermes"
 echo "=== 🛠️ Setting up Sandbox Environment ==="
 mkdir -p "$SANDBOX_DIR/skills"
 
-# 1. Copy real config to sandbox so LLM (9router) connection works
+# 1. Copy real config to sandbox so LLM proxy connection works
 if [ -f "$REAL_HERMES/config.yaml" ]; then
     echo "📋 Copying config.yaml to sandbox..."
     cp "$REAL_HERMES/config.yaml" "$SANDBOX_DIR/"
 else
     echo "⚠️ No real config.yaml found. LLM integration might fail."
     echo "Creating dummy config..."
-    echo "base_url: http://127.0.0.1:20128/v1" > "$SANDBOX_DIR/config.yaml"
+    echo "base_url: http://localhost:20128/v1" > "$SANDBOX_DIR/config.yaml"
 fi
 
 # 2. Create a dummy test skill in sandbox
@@ -43,7 +43,7 @@ EOF
 echo ""
 echo "=== 🚀 Launching Studio in SANDBOX MODE ==="
 echo "Targeting: $SANDBOX_DIR"
-echo "Backend: http://127.0.0.1:8766"
+echo "Backend: http://localhost:8766"
 echo "Frontend: http://localhost:5173"
 echo "Note: Any changes made in the UI will happen in the sandbox directory."
 echo ""

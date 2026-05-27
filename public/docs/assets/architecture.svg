@@ -22,7 +22,7 @@
   <text x="125" y="235" font-family="Inter, sans-serif" font-size="14" fill="#3FB950" text-anchor="middle">User (~/.hermes)</text>
   
   <rect x="600" y="200" width="150" height="60" rx="4" fill="#D29922" fill-opacity="0.1" stroke="#D29922"/>
-  <text x="675" y="235" font-family="Inter, sans-serif" font-size="14" fill="#D29922" text-anchor="middle">Local LLM (9router)</text>
+  <text x="675" y="235" font-family="Inter, sans-serif" font-size="14" fill="#D29922" text-anchor="middle">LLM proxy</text>
 
   <!-- Arrows -->
   <path d="M200 230H250" stroke="#30363D" stroke-width="2" marker-end="url(#arrow)"/>

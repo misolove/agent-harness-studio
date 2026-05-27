@@ -13,7 +13,7 @@
 
 - **백엔드**: FastAPI (Python 3.13+), 포트 8766
 - **프론트엔드**: React + Vite, 포트 5173
-- **LLM**: 9router 로컬 프록시 (`http://127.0.0.1:20128/v1`, 모델 `letitbe`) -> OpenAI API 자동 폴백 지원
+- **LLM**: LLM proxy (`http://localhost:20128/v1`) -> OpenAI API 자동 폴백 지원
 - **대상 데이터**: `~/.hermes` 디렉토리 (환경변수 `HERMES_HOME`으로 오버라이드)
 
 ---
@@ -44,7 +44,7 @@
 | **Context Window Estimator (토큰)** | `App.jsx` + `hermes_scanner.py` | 완료 (2026-05-25 추가) |
 | **Cross-Agent Skill Converter** | `App.jsx` + `app.py` | 완료 (2026-05-25 추가) |
 | **SQLite Audit Log (changelog)** | `app.py` + `App.jsx` | 완료 (2026-05-25 추가) |
-| **9router 폴백 (OpenAI API)** | `app.py` | 완료 (2026-05-25 추가) |
+| **LLM proxy 폴백 (OpenAI API)** | `app.py` | 완료 (2026-05-25 추가) |
 | **범용 텍스트 파일 편집 (Universal Edit)** | `App.jsx` + `app.py` | 완료 (2026-05-25 추가) |
 | **Chat Molder 대화형 UI & 마크다운 렌더러** | `App.jsx` (`MarkdownContent`) | 완료 (2026-05-25 개선) |
 | **LLM 응답 파싱 강건성 및 히스토리 유지** | `app.py` (`parse_molder_json`) | 완료 (2026-05-25 개선) |
@@ -111,9 +111,9 @@ Tauri 마이그레이션은 프로덕션 배포 단계에서 고려 가능.
 Claude Code의 `~/.claude` 구조(CLAUDE.md, rules/, skills/, hooks/)와 다릅니다.
 두 에이전트를 모두 지원하려면 스캐너 추상화 레이어 필요.
 
-### 9router LLM 프록시
-Chat Molder는 OpenAI SDK를 9router(`http://127.0.0.1:20128/v1`)에 연결.
-9router가 없으면 LLM 기능 전체 불가. OpenAI API 키 폴백 필요.
+### LLM Proxy
+Chat Molder는 OpenAI SDK를 LLM proxy(`http://localhost:20128/v1`)에 연결.
+LLM proxy가 없으면 LLM 기능 전체 불가. OpenAI API 키 폴백 필요.
 
 ---
 
@@ -193,7 +193,7 @@ agent-harness-studio/
 
 ### P1 — 즉시 필요
 1. **훅/MCP/컨텍스트 Edit 버튼 추가**: 스킬 외 다른 타입도 편집 가능하게
-2. **9router 폴백**: 9router 없을 때 OpenAI API 키로 자동 폴백
+2. **LLM proxy 폴백**: LLM proxy 없을 때 OpenAI API 키로 자동 폴백
 
 ### P2 — 주요 기능
 3. **변경 이력 UI**: `.bak.*` 파일 목록을 UI에서 보여주고 선택 롤백 가능하게
@@ -211,16 +211,16 @@ agent-harness-studio/
 
 ```bash
 # 백엔드 단독 테스트
-curl http://127.0.0.1:8766/api/scan | python3 -m json.tool
-curl http://127.0.0.1:8766/api/env
+curl http://localhost:8766/api/scan | python3 -m json.tool
+curl http://localhost:8766/api/env
 
 # 샌드박스에서 스킬 생성 테스트
-curl -X POST http://127.0.0.1:8766/api/save \
+curl -X POST http://localhost:8766/api/save \
   -H "Content-Type: application/json" \
   -d '{"path": "~/.hermes/sandbox/skills/test-skill/SKILL.md", "content": "---\nname: test-skill\n---\n\nTest"}'
 
 # 읽기 전용 모드 확인
-HARNESS_READONLY=1 curl -X POST http://127.0.0.1:8766/api/save \
+HARNESS_READONLY=1 curl -X POST http://localhost:8766/api/save \
   -H "Content-Type: application/json" \
   -d '{"path": "/tmp/test", "content": "x"}'
 # → 403 반환 확인
@@ -233,7 +233,7 @@ python src/scanner/hermes_scanner.py
 
 ## 9. 알려진 제약사항
 
-- **9router 의존성**: Chat Molder는 9router가 실행 중이어야 작동. 없으면 500 에러.
+- **LLM proxy 의존성**: Chat Molder는 LLM proxy가 실행 중이어야 작동. 없으면 500 에러.
 - **단일 사용자 전제**: API 인증 없음. localhost 전용.
 - **대용량 스킬 디렉토리**: 스킬 수 > 100이면 스캔 속도 저하 가능 (비동기 처리 미적용).
 - **브라우저 스크래퍼**: playwright 브라우저 미설치 시 Phase 4 실패. `playwright install chromium` 필요.

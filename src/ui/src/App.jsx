@@ -15,7 +15,7 @@ import "./App.css";
 import ScrapingPipeline from "./ScrapingPipeline.jsx";
 
 const LLM_PROVIDER_PRESETS = [
-  { provider: "9router", base_url: "http://127.0.0.1:20128/v1", model: "letitbe" },
+  { provider: "llm-proxy", base_url: "http://localhost:20128/v1", model: "harness-model" },
   { provider: "OpenAI", base_url: "", model: "gpt-4o" },
   { provider: "OpenAI Compatible", base_url: "http://127.0.0.1:11434/v1", model: "llama3.1" },
   { provider: "Custom", base_url: "", model: "" },
@@ -2491,7 +2491,7 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
               <input
                 value={llmDraft.base_url}
                 onChange={e => setLlmDraft(v => ({ ...v, base_url: e.target.value }))}
-                placeholder="http://127.0.0.1:20128/v1"
+                placeholder="http://localhost:20128/v1"
               />
             </label>
             <label>
@@ -2499,7 +2499,7 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
               <input
                 value={llmDraft.model}
                 onChange={e => setLlmDraft(v => ({ ...v, model: e.target.value }))}
-                placeholder="letitbe"
+                placeholder="harness-model"
               />
             </label>
             <label>

@@ -456,7 +456,7 @@ Harness Core
 
 ## 8-4. 보안 고려사항
 
-- 로컬호스트 바인딩 기본값: 127.0.0.1
+- 로컬호스트 바인딩 기본값: localhost
 - 외부 네트워크 접근 기본 비활성
 - secret 마스킹
 - write allowlist 경로 제한

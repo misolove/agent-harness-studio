@@ -1,6 +1,6 @@
 # API Reference — Agent Harness Studio
 
-Base URL: `http://127.0.0.1:8766`
+Base URL: `http://localhost:8766`
 
 ---
 
@@ -11,7 +11,7 @@ Base URL: `http://127.0.0.1:8766`
 **Response:**
 ```json
 {
-  "hermes_home": "/Users/letitbe/.hermes",
+  "hermes_home": "~/.hermes",
   "is_sandbox": false,
   "is_readonly": false,
   "is_git_repo": true,
@@ -38,9 +38,9 @@ Studio가 스캔/관리할 수 있는 로컬 agent workspace 목록을 반환합
 **Response:**
 ```json
 [
-  {"id": "hermes", "name": "Hermes", "path": "/Users/letitbe/.hermes"},
-  {"id": "claude", "name": "Claude Code", "path": "/Users/letitbe/.claude"},
-  {"id": "codex", "name": "Codex", "path": "/Users/letitbe/.codex"}
+  {"id": "hermes", "name": "Hermes", "path": "~/.hermes"},
+  {"id": "claude", "name": "Claude Code", "path": "~/.claude"},
+  {"id": "codex", "name": "Codex", "path": "~/.codex"}
 ]
 ```
 
@@ -136,7 +136,7 @@ Studio가 스캔/관리할 수 있는 로컬 agent workspace 목록을 반환합
 
 **Request:**
 ```
-GET /api/read?path=%2FUsers%2Fletitbe%2F.hermes%2Fskills%2Fmy-skill%2FSKILL.md
+GET /api/read?path=%7E%2F.hermes%2Fskills%2Fmy-skill%2FSKILL.md
 ```
 
 **Response (200):**
@@ -282,7 +282,7 @@ root context의 기본 위치와 스키마를 같은 기준으로 해석합니�
 LLM 응답이 JSON 파싱 실패 시 원본 텍스트를 `message`로 반환 (fallback CHAT).
 
 **Error:**
-- `500` — LLM 호출 실패 (9router 미실행 등)
+- `500` — LLM 호출 실패 (LLM proxy 미실행 등)
 
 ---
 
@@ -380,7 +380,7 @@ URL에서 콘텐츠를 스크래핑합니다. Firecrawl → Jina → TLS → Bro
 **Response:**
 ```json
 {
-  "workspace": "/Users/letitbe/.claude",
+  "workspace": "~/.claude",
   "scanner": "ClaudeScanner",
   "category_counts": {"HIGH_VALUE": 1, "STALE_UNUSED": 72, "ARCHIVE": 190},
   "recommendations": [
@@ -410,16 +410,16 @@ URL에서 콘텐츠를 스크래핑합니다. Firecrawl → Jina → TLS → Bro
 **Request body:**
 ```json
 {
-  "source_path": "/Users/letitbe/.claude/skills/example/SKILL.md",
-  "workspace": "/Users/letitbe/.claude"
+  "source_path": "~/.claude/skills/example/SKILL.md",
+  "workspace": "~/.claude"
 }
 ```
 
 **Response:**
 ```json
 {
-  "archived_to": "/Users/letitbe/.claude-archive/20260527/skills/example/SKILL.md",
-  "original": "/Users/letitbe/.claude/skills/example/SKILL.md"
+  "archived_to": "~/.claude-archive/20260527/skills/example/SKILL.md",
+  "original": "~/.claude/skills/example/SKILL.md"
 }
 ```
 
@@ -430,8 +430,8 @@ URL에서 콘텐츠를 스크래핑합니다. Firecrawl → Jina → TLS → Bro
 **Request body:**
 ```json
 {
-  "source_path": "/Users/letitbe/.claude/skills/example/SKILL.md",
-  "target_workspace": "/Users/letitbe/.hermes",
+  "source_path": "~/.claude/skills/example/SKILL.md",
+  "target_workspace": "~/.hermes",
   "target_subdir": "skills/example"
 }
 ```
@@ -463,8 +463,8 @@ Claude Code Skill 파일을 읽어 Hermes Skill 형식으로 변환하고 `~/.he
 **Request body:**
 ```json
 {
-  "source_path": "/Users/letitbe/.claude/skills/agency-client-interview/SKILL.md",
-  "target_workspace": "/Users/letitbe/.hermes",
+  "source_path": "~/.claude/skills/agency-client-interview/SKILL.md",
+  "target_workspace": "~/.hermes",
   "source_agent": "claude-code",
   "overwrite": false,
   "dry_run": false
@@ -484,8 +484,8 @@ Claude Code Skill 파일을 읽어 Hermes Skill 형식으로 변환하고 `~/.he
 {
   "status": "dry_run",
   "skill_name": "agency-client-interview",
-  "source": "/Users/letitbe/.claude/skills/agency-client-interview/SKILL.md",
-  "path": "/Users/letitbe/.hermes/skills/agency-client-interview/SKILL.md",
+  "source": "~/.claude/skills/agency-client-interview/SKILL.md",
+  "path": "~/.hermes/skills/agency-client-interview/SKILL.md",
   "would_overwrite": false,
   "content": "---\nname: agency-client-interview\n..."
 }
@@ -496,7 +496,7 @@ Claude Code Skill 파일을 읽어 Hermes Skill 형식으로 변환하고 `~/.he
 {
   "status": "injected",
   "skill_name": "agency-client-interview",
-  "path": "/Users/letitbe/.hermes/skills/agency-client-interview/SKILL.md",
+  "path": "~/.hermes/skills/agency-client-interview/SKILL.md",
   "backup": null,
   "copied_assets": ["references"],
   "git": {"committed": true}
@@ -526,7 +526,7 @@ read-only Pi run을 시작합니다. 현재 허용 도구는 `read,grep,find,ls`
 **Request body:**
 ```json
 {
-  "workspace": "/Users/letitbe/letitbe/agent-harness-studio",
+  "workspace": "/Users/user/harness-studio",
   "mode": "read_only",
   "prompt": "List Python files and summarize them."
 }
@@ -617,7 +617,7 @@ workspace의 `state.db`에서 세션 목록을 반환합니다.
       "short_hash": "a1b2c3d",
       "message": "harness-studio: edit my-skill",
       "date": "2026-05-24 15:30:12 +0900",
-      "author": "letitbe"
+      "author": "user"
     }
   ]
 }
