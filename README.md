@@ -158,7 +158,7 @@ Claude Code Skill을 Hermes Skill로 변환/주입합니다.
 │  GET  /api/read          → Path.read_text()                    │
 │  POST /api/save          → 백업 + 쓰기 + git 커밋              │
 │  POST /api/rollback      → .bak.* 복원                         │
-│  POST /api/mold          → OpenAI SDK → LLM proxy / OpenAI         │
+│  POST /api/mold          → OpenAI SDK → LLM proxy / OpenAI     │
 │  POST /api/web/scrape    → HybridScraper (4단계)               │
 │  GET  /api/env           → HERMES_HOME, sandbox, readonly, git │
 │  POST /api/git/init      → git 초기화 + 첫 커밋               │
@@ -176,8 +176,9 @@ Claude Code Skill을 Hermes Skill로 변환/주입합니다.
            │                                      │
            ▼                                      ▼
 ┌──────────────────────┐            ┌─────────────────────────────┐
-│   ~/.hermes           │            │  LLM proxy (localhost:20128)   │
+│   ~/.hermes           │            │  LLM proxy (localhost:20128)│
 │   (또는 $HERMES_HOME) │            │  - 로컬 LLM 프록시           │
+│                      │            │  - 모델명: "harness-model"   │
 │                      │            │  - OpenAI API 호환           │
 │  skill-bundles/      │            └─────────────────────────────┘
 │  memory/             │
