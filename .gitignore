@@ -14,3 +14,11 @@ node_modules/
 .omx/
 state/
 patch_*.py
+
+# 해커톤 임시 산출물
+docs/harnessthon-2026-pitch*.pptx
+docs/build_pitch_pptx*.py
+
+# 백업 파일
+*.monolith.bak
+*.bak
