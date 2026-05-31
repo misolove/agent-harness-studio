@@ -207,11 +207,32 @@ class HermesScanner:
         skill_roots.extend(("external", path) for path in self._configured_external_skill_dirs())
         disabled = self._disabled_skill_names()
 
+        # 심링크 추적 시 제외할 디렉토리 (.archive는 ARCHIVED로 표시하려고 일부러 포함)
+        excluded_dirs = {
+            "venv", ".venv", ".git", "__pycache__", "node_modules",
+            ".pytest_cache", ".mypy_cache", ".ruff_cache", "site-packages",
+            ".tox", ".nox", ".github", ".hub",
+        }
+
         for source_kind, skills_dir in skill_roots:
             if not skills_dir.exists():
                 continue
 
-            for skill_file in skills_dir.rglob("SKILL.md"):
+            # rglob은 심링크 디렉토리를 따라가지 않아 ~/.agents/skills 공유 스킬을 놓친다.
+            # Hermes(iter_skill_index_files)와 동일하게 followlinks=True로 추적.
+            seen_resolved = set()
+            for root, dirs, files in os.walk(skills_dir, followlinks=True):
+                dirs[:] = [d for d in dirs if d not in excluded_dirs]
+                if "SKILL.md" not in files:
+                    continue
+                skill_file = Path(root) / "SKILL.md"
+                try:
+                    resolved = skill_file.resolve()
+                except Exception:
+                    resolved = skill_file
+                if resolved in seen_resolved:  # 심링크 순환/중복 방지
+                    continue
+                seen_resolved.add(resolved)
                 results.append(self._scan_skill_file(skill_file, skills_dir, source_kind, disabled))
 
         return results
@@ -228,14 +249,19 @@ class HermesScanner:
         skill_dir = skill_file.parent
         name_from_path = skill_dir.name
 
+        # 숨김 디렉토리(.archive 등 .으로 시작)의 스킬은 아카이브(비활성) 처리.
+        # Hermes curator가 stale/archive_after_days 정책으로 옮긴 스킬들.
+        is_archived = any(p.startswith(".") for p in rel_parts[:-1])
+
         item = {
             "type": "Skill",
             "name": name_from_path,
             "source_path": str(skill_file),
-            "state": "ACTIVE",
+            "state": "ARCHIVED" if is_archived else "ACTIVE",
             "summary": "",
             "metadata": {
                 "source": source_kind,
+                "archived": is_archived,
                 "category": category_from_path or "Uncategorized",
                 "path_category": category_from_path,
                 "has_references": (skill_dir / "references").is_dir(),
@@ -278,7 +304,9 @@ class HermesScanner:
                 platform for platform, names in platform_disabled.items()
                 if item["name"] in names or name_from_path in names
             )
-            if item["name"] in global_disabled or name_from_path in global_disabled:
+            if is_archived:
+                pass  # 아카이브 상태 유지 (disabled 판정보다 우선)
+            elif item["name"] in global_disabled or name_from_path in global_disabled:
                 item["state"] = "INACTIVE"
                 item["metadata"]["disabled"] = True
                 item["metadata"]["disabled_scope"] = "global"
@@ -349,6 +377,11 @@ class HermesScanner:
         # 2. memory_manifest.md
         manifest_path = self.hermes_dir / "memory_manifest.md"
         if manifest_path.exists():
+            try:
+                with open(manifest_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+            except Exception:
+                content = ""
             results.append({
                 "type": "Memory Manifest",
                 "name": "Manifest File",
@@ -356,7 +389,8 @@ class HermesScanner:
                 "state": "ACTIVE",
                 "summary": "Global memory manifest description",
                 "metadata": {
-                    "size_bytes": manifest_path.stat().st_size
+                    "size_bytes": manifest_path.stat().st_size,
+                    "content": content
                 }
             })
 
@@ -365,8 +399,20 @@ class HermesScanner:
             memory_dir = self.hermes_dir / dir_name
             if not memory_dir.exists():
                 continue
-            md_files = [f for f in memory_dir.iterdir() if f.suffix == ".md" and f.is_file()]
+            md_files = [f for f in memory_dir.rglob("*.md") if f.is_file() and not f.name.endswith(".lock")]
             all_files = [f for f in memory_dir.rglob("*") if f.is_file() and f.suffix != ".lock"]
+            
+            md_contents = {}
+            md_rel_paths = []
+            for f in md_files:
+                rel = str(f.relative_to(memory_dir))
+                md_rel_paths.append(rel)
+                try:
+                    with open(f, "r", encoding="utf-8") as file_obj:
+                        md_contents[rel] = file_obj.read()
+                except Exception:
+                    md_contents[rel] = ""
+                    
             results.append({
                 "type": "Memory Directory",
                 "name": label,
@@ -376,14 +422,26 @@ class HermesScanner:
                 "metadata": {
                     "dir_name": dir_name,
                     "file_count": len(all_files),
-                    "md_files": [f.name for f in md_files],
+                    "md_files": md_rel_paths,
+                    "md_contents": md_contents,
                 }
             })
 
         # 4. State dir
         state_dir = self.hermes_dir / "state"
         if state_dir.exists():
-            state_files = [f.name for f in state_dir.iterdir() if f.is_file()]
+            state_files = [f.name for f in state_dir.iterdir() if f.is_file() and f.name != ".DS_Store"]
+            state_contents = {}
+            for f in state_dir.iterdir():
+                if f.is_file() and f.name != ".DS_Store":
+                    try:
+                        with open(f, "r", encoding="utf-8") as file_obj:
+                            text = file_obj.read()
+                            # 미리보기 1000자로 제한
+                            state_contents[f.name] = text[:1000] + ("..." if len(text) > 1000 else "")
+                    except Exception:
+                        state_contents[f.name] = "<binary or unreadable>"
+                        
             results.append({
                 "type": "Memory State",
                 "name": "State Directory",
@@ -391,7 +449,38 @@ class HermesScanner:
                 "state": "ACTIVE",
                 "summary": "Persistent state files",
                 "metadata": {
-                    "files": state_files
+                    "files": state_files,
+                    "contents": state_contents
+                }
+            })
+            
+        # 5. Reflections dir
+        reflections_dir = self.hermes_dir / "reflections"
+        if reflections_dir.exists():
+            ref_files = [f for f in reflections_dir.rglob("*.md") if f.is_file()]
+            ref_contents = {}
+            ref_rel_paths = []
+            for f in ref_files:
+                rel = str(f.relative_to(reflections_dir))
+                ref_rel_paths.append(rel)
+                try:
+                    with open(f, "r", encoding="utf-8") as file_obj:
+                        text = file_obj.read()
+                        ref_contents[rel] = text
+                except Exception:
+                    ref_contents[rel] = ""
+                    
+            results.append({
+                "type": "Memory Directory",
+                "name": "Reflections",
+                "source_path": str(reflections_dir),
+                "state": "ACTIVE",
+                "summary": f"{len(ref_files)}개 회고 파일 (reflections/)",
+                "metadata": {
+                    "dir_name": "reflections",
+                    "file_count": len(ref_files),
+                    "md_files": ref_rel_paths,
+                    "md_contents": ref_contents,
                 }
             })
 

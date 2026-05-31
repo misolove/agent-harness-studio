@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Sparkles, Package, Plug, Webhook, Brain, Clock, Boxes, FileText, Settings, ScrollText, History, Database, GitCommit, Play, GitCompare, ShieldCheck, Globe, Shield } from "lucide-react";
 import EditorModule from 'react-simple-code-editor';
 const Editor = EditorModule.default || EditorModule;
 import Prism from 'prismjs';
@@ -13,6 +14,9 @@ import 'prismjs/components/prism-bash';
 import 'prismjs/themes/prism-tomorrow.css';
 import "./App.css";
 import ScrapingPipeline from "./ScrapingPipeline.jsx";
+import ChatPanel from './components/ChatPanel';
+import EditorErrorBoundary from './components/EditorErrorBoundary';
+import AgentRunnerPanel from './components/AgentRunnerPanel';
 
 const LLM_PROVIDER_PRESETS = [
   { provider: "llm-proxy", base_url: "http://localhost:20128/v1", model: "harness-model" },
@@ -21,87 +25,24 @@ const LLM_PROVIDER_PRESETS = [
   { provider: "Custom", base_url: "", model: "" },
 ];
 
-class EditorErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error, errorInfo) {
-    console.error("Editor Error:", error, errorInfo);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: "20px", background: "#fee", color: "#c00", borderRadius: "8px" }}>
-          <h4>Editor crashed!</h4>
-          <pre style={{ whiteSpace: "pre-wrap", fontSize: "12px" }}>{this.state.error?.toString()}</pre>
-          <button onClick={() => this.setState({ hasError: false })} style={{ marginTop: "10px" }}>Retry</button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+// Hermes — 실제 브랜드 배너 이미지
+const HERMES_BG = `url('/hermes-banner.png')`;
 
+// OpenClaw — 실제 브랜드 배너 이미지
+const OPENCLAW_BG = `url('/openclaw-banner.png')`;
 
-
-function renderInlineMarkdown(text) {
-  const parts = [];
-  const pattern = /(`[^`]+`|\*\*[^*]+\*\*)/g;
-  let lastIndex = 0;
-  let match;
-
-  while ((match = pattern.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(text.slice(lastIndex, match.index));
-    }
-
-    const token = match[0];
-    if (token.startsWith("**")) {
-      parts.push(<strong key={parts.length}>{token.slice(2, -2)}</strong>);
-    } else if (token.startsWith("`")) {
-      parts.push(<code key={parts.length}>{token.slice(1, -1)}</code>);
-    }
-    lastIndex = match.index + token.length;
-  }
-
-  if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex));
-  }
-
-  return parts;
-}
-
-function parseMarkdownTable(lines, startIndex) {
-  const header = lines[startIndex];
-  const divider = lines[startIndex + 1];
-  if (!header?.includes("|") || !divider?.match(/^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/)) {
-    return null;
-  }
-
-  const tableLines = [header, divider];
-  let index = startIndex + 2;
-  while (index < lines.length && lines[index].includes("|") && lines[index].trim()) {
-    tableLines.push(lines[index]);
-    index += 1;
-  }
-
-  const splitRow = (line) => line
-    .trim()
-    .replace(/^\|/, "")
-    .replace(/\|$/, "")
-    .split("|")
-    .map((cell) => cell.trim());
-
-  return {
-    headers: splitRow(tableLines[0]),
-    rows: tableLines.slice(2).map(splitRow),
-    nextIndex: index,
-  };
-}
+// 에이전트별 테마 색상 정의
+const AGENT_THEMES = {
+  hermes:      { accent: '#8f75ff', accentBlue: '#5d7cff', accentGlow: 'rgba(143,117,255,0.25)', bgDeep: '#070716', bgPanel: '#0c0c20', border: 'rgba(42,42,90,0.5)',   dot: '#8f75ff', bgImage: HERMES_BG,   bgOpacity: 0.15 },
+  claude:      { accent: '#d97706', accentBlue: '#f59e0b', accentGlow: 'rgba(217,119,6,0.25)',   bgDeep: '#0f0800', bgPanel: '#140b00', border: 'rgba(80,45,8,0.5)',    dot: '#d97706', bgImage: null,         bgOpacity: 0    },
+  codex:       { accent: '#10a37f', accentBlue: '#19c37d', accentGlow: 'rgba(16,163,127,0.25)', bgDeep: '#030d09', bgPanel: '#051209', border: 'rgba(8,55,35,0.5)',    dot: '#10a37f', bgImage: null,         bgOpacity: 0    },
+  cursor:      { accent: '#6b48ff', accentBlue: '#a78bfa', accentGlow: 'rgba(107,72,255,0.25)', bgDeep: '#060512', bgPanel: '#09071e', border: 'rgba(45,28,90,0.5)',   dot: '#6b48ff', bgImage: null,         bgOpacity: 0    },
+  openclaw:    { accent: '#f97316', accentBlue: '#fb923c', accentGlow: 'rgba(249,115,22,0.25)', bgDeep: '#100500', bgPanel: '#180800', border: 'rgba(75,28,5,0.5)',    dot: '#f97316', bgImage: OPENCLAW_BG,  bgOpacity: 0.18 },
+  gemini:      { accent: '#4285f4', accentBlue: '#34a853', accentGlow: 'rgba(66,133,244,0.25)', bgDeep: '#030d1a', bgPanel: '#051525', border: 'rgba(8,38,75,0.5)',    dot: '#4285f4', bgImage: null,         bgOpacity: 0    },
+  antigravity: { accent: '#00bcd4', accentBlue: '#0097a7', accentGlow: 'rgba(0,188,212,0.25)', bgDeep: '#030d10', bgPanel: '#041316', border: 'rgba(0,55,65,0.5)',    dot: '#00bcd4', bgImage: null,         bgOpacity: 0    },
+  studio:      { accent: '#8f75ff', accentBlue: '#5d7cff', accentGlow: 'rgba(143,117,255,0.25)', bgDeep: '#070716', bgPanel: '#0c0c20', border: 'rgba(42,42,90,0.5)',   dot: '#8f75ff', bgImage: null,         bgOpacity: 0    },
+};
+const DEFAULT_THEME = AGENT_THEMES.hermes;
 
 function formatSessionDate(value) {
   if (value === null || value === undefined || value === "") return "";
@@ -116,162 +57,6 @@ function formatSessionDate(value) {
     return formatSessionDate(numeric);
   }
   return text.slice(0, 10);
-}
-
-function MarkdownContent({ text }) {
-  const lines = String(text || "").split(/\r?\n/);
-  const blocks = [];
-  let index = 0;
-
-  while (index < lines.length) {
-    const line = lines[index];
-    const trimmed = line.trim();
-
-    if (!trimmed) {
-      index += 1;
-      continue;
-    }
-
-    const table = parseMarkdownTable(lines, index);
-    if (table) {
-      blocks.push(
-        <div className="md-table-wrap" key={blocks.length}>
-          <table className="md-table">
-            <thead>
-              <tr>{table.headers.map((cell, i) => <th key={i}>{renderInlineMarkdown(cell)}</th>)}</tr>
-            </thead>
-            <tbody>
-              {table.rows.map((row, rowIndex) => (
-                <tr key={rowIndex}>
-                  {table.headers.map((_, cellIndex) => (
-                    <td key={cellIndex}>{renderInlineMarkdown(row[cellIndex] || "")}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
-      index = table.nextIndex;
-      continue;
-    }
-
-    if (trimmed.startsWith("### ")) {
-      blocks.push(<h4 key={blocks.length}>{renderInlineMarkdown(trimmed.slice(4))}</h4>);
-      index += 1;
-      continue;
-    }
-
-    if (trimmed.startsWith("## ")) {
-      blocks.push(<h3 key={blocks.length}>{renderInlineMarkdown(trimmed.slice(3))}</h3>);
-      index += 1;
-      continue;
-    }
-
-    if (/^[-*]\s+/.test(trimmed)) {
-      const items = [];
-      while (index < lines.length && /^[-*]\s+/.test(lines[index].trim())) {
-        items.push(lines[index].trim().replace(/^[-*]\s+/, ""));
-        index += 1;
-      }
-      blocks.push(
-        <ul key={blocks.length}>
-          {items.map((item, i) => <li key={i}>{renderInlineMarkdown(item)}</li>)}
-        </ul>
-      );
-      continue;
-    }
-
-    if (/^\d+\.\s+/.test(trimmed)) {
-      const items = [];
-      while (index < lines.length && /^\d+\.\s+/.test(lines[index].trim())) {
-        items.push(lines[index].trim().replace(/^\d+\.\s+/, ""));
-        index += 1;
-      }
-      blocks.push(
-        <ol key={blocks.length}>
-          {items.map((item, i) => <li key={i}>{renderInlineMarkdown(item)}</li>)}
-        </ol>
-      );
-      continue;
-    }
-
-    if (trimmed === "---") {
-      blocks.push(<hr key={blocks.length} />);
-      index += 1;
-      continue;
-    }
-
-    blocks.push(<p key={blocks.length}>{renderInlineMarkdown(trimmed)}</p>);
-    index += 1;
-  }
-
-  return <div className="markdown-content">{blocks}</div>;
-}
-
-function extractJsonMessageFragment(text) {
-  const source = String(text || "");
-  const fieldIndex = source.indexOf('"message"');
-  if (fieldIndex < 0) return null;
-
-  const colonIndex = source.indexOf(":", fieldIndex + 9);
-  if (colonIndex < 0) return null;
-
-  const quoteIndex = source.indexOf('"', colonIndex + 1);
-  if (quoteIndex < 0) return null;
-
-  let output = "";
-  for (let index = quoteIndex + 1; index < source.length; index += 1) {
-    const char = source[index];
-    if (char === '"') break;
-    if (char === "\\" && index + 1 < source.length) {
-      const escaped = source[index + 1];
-      if (escaped === "n") {
-        output += "\n";
-        index += 1;
-        continue;
-      }
-      if (escaped === "t") {
-        output += "\t";
-        index += 1;
-        continue;
-      }
-      if (escaped === "r") {
-        index += 1;
-        continue;
-      }
-      if (escaped === '"' || escaped === "\\" || escaped === "/") {
-        output += escaped;
-        index += 1;
-        continue;
-      }
-    }
-    output += char;
-  }
-
-  return output.trim() || null;
-}
-
-function normalizeMolderMessage(data) {
-  const message = String(data?.message || "");
-  const trimmed = message.trim();
-  if (!trimmed.startsWith("{") || !trimmed.includes('"message"')) {
-    return message;
-  }
-
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (parsed && typeof parsed.message === "string") {
-      return parsed.message;
-    }
-  } catch {
-    const recovered = extractJsonMessageFragment(trimmed);
-    if (recovered) {
-      return `${recovered}\n\n(응답이 길어 일부가 잘렸습니다. 더 좁은 범위로 다시 물어보면 이어서 정리할 수 있어요.)`;
-    }
-  }
-
-  return "응답 형식을 정리하지 못했습니다. 질문 범위를 조금 좁혀서 다시 말씀해주세요.";
 }
 
 function App() {
@@ -355,7 +140,7 @@ function App() {
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(0);
 
-  const MAX_CONTEXT_TOKENS = 128000;
+  const MAX_CONTEXT_TOKENS = envInfo?.context_length || 128000;
 
   const SOUL_PRESETS = {
     developer: `# Persona: Developer / Coding Assistant
@@ -1028,29 +813,47 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
     return () => { document.removeEventListener("visibilitychange", onVisibility); };
   }, [activeWorkspace]);
 
+  // 워크스페이스 변경 시 에이전트 테마 CSS 변수 적용
+  useEffect(() => {
+    if (!activeWorkspace || workspaces.length === 0) return;
+    const ws = workspaces.find(w => w.path === activeWorkspace);
+    const theme = (ws && AGENT_THEMES[ws.id]) || DEFAULT_THEME;
+    const root = document.documentElement;
+    root.style.setProperty('--accent-purple', theme.accent);
+    root.style.setProperty('--accent-blue', theme.accentBlue);
+    root.style.setProperty('--accent-glow', theme.accentGlow);
+    root.style.setProperty('--bg-deep', theme.bgDeep);
+    root.style.setProperty('--bg-panel', theme.bgPanel);
+    root.style.setProperty('--border', theme.border);
+    // 워터마크: CSS ::after 의사 요소를 CSS 변수로 제어
+    root.style.setProperty('--theme-bg-image', theme.bgImage || 'none');
+    root.style.setProperty('--theme-bg-opacity', String(theme.bgOpacity));
+  }, [activeWorkspace, workspaces]);
+
   const handleManualRefresh = () => {
     fetchHarness();
     fetchAgentRunners();
   };
 
   const sections = [
-    { id: "skills", title: "Skills", icon: "🛠️" },
-    { id: "bundles", title: "Skill Bundles", icon: "📦" },
-    { id: "mcp", title: "MCP", icon: "🔌" },
-    { id: "hooks", title: "Hooks", icon: "🪝" },
-    { id: "memory", title: "Memory Map", icon: "🧠" },
-    { id: "cron", title: "Cron", icon: "⏰" },
-    { id: "plugins", title: "Plugins", icon: "🧩" },
-    { id: "context", title: "Context", icon: "📜" },
-    { id: "config", title: "Config", icon: "⚙️" },
-    { id: "logs", title: "Logs", icon: "🧾" },
-    { id: "sessions", title: "Sessions", icon: "🗂️" },
-    { id: "statedb", title: "State DB", icon: "🗄️" },
-    { id: "checkpoints", title: "Checkpoints", icon: "🔖" },
-    { id: "agent-runners", title: "Agent Runner", icon: "▶" },
-    { id: "diff-audit", title: "Diff Audit", icon: "🔍" },
-    { id: "audit", title: "Audit Log", icon: "📋" },
-    { id: "web", title: "Web Context", icon: "🌐" },
+    { id: "skills",        title: "Skills",        Icon: Sparkles   },
+    { id: "bundles",       title: "Skill Bundles", Icon: Package    },
+    { id: "mcp",           title: "MCP",           Icon: Plug       },
+    { id: "hooks",         title: "Hooks",         Icon: Webhook    },
+    { id: "memory",        title: "Memory Map",    Icon: Brain      },
+    { id: "cron",          title: "Cron",          Icon: Clock      },
+    { id: "plugins",       title: "Plugins",       Icon: Boxes      },
+    { id: "context",       title: "Context",       Icon: FileText   },
+    { id: "config",        title: "Config",        Icon: Settings   },
+    { id: "logs",          title: "Logs",          Icon: ScrollText },
+    { id: "sessions",      title: "Sessions",      Icon: History    },
+    { id: "statedb",       title: "State DB",      Icon: Database   },
+    { id: "checkpoints",   title: "Checkpoints",   Icon: GitCommit  },
+    { id: "agent-runners", title: "Agent Runner",  Icon: Play       },
+    { id: "diff-audit",    title: "Diff Audit",    Icon: GitCompare },
+    { id: "audit",         title: "Audit Log",     Icon: ShieldCheck},
+    { id: "env",           title: "Environment",   Icon: Shield     },
+    { id: "web",           title: "Web Context",   Icon: Globe      },
   ];
 
   const getFilteredItems = () => {
@@ -1072,6 +875,7 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
       "agent-runners": ["Agent Runner"],
       "diff-audit": [],
       audit: [],
+      env: [],
       web: [],
     };
     const allowed = map[selectedSection] || [];
@@ -1404,6 +1208,8 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
   };
 
   const activeWorkspaceName = workspaces.find(ws => ws.path === activeWorkspace)?.name || "Agent";
+  const activeWsObj = workspaces.find(ws => ws.path === activeWorkspace);
+  const activeTheme = (activeWsObj && AGENT_THEMES[activeWsObj.id]) || DEFAULT_THEME;
   const editorKind = getEditorKind(editingItem);
   const editorPath = editingItem?.source_path || "";
   const editorFileName = editorPath.split("/").pop() || editingItem?.name || "";
@@ -1412,6 +1218,8 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
 
   return (
     <div className="app-layout">
+      {/* 워터마크: CSS ::after 의사 요소로 렌더링 (CSS 변수로 제어) */}
+
       {/* Left Sidebar: Controls & Dashboard */}
       <aside className="sidebar-container">
         <header className="app-header">
@@ -1427,7 +1235,10 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
           </div>
 
           <div className="workspace-selector">
-            <span className="workspace-label">Agent</span>
+            <span className="workspace-label">
+              <span className="agent-theme-dot" style={{ background: activeTheme.dot }} />
+              Agent
+            </span>
             <select value={activeWorkspace} onChange={handleWorkspaceChange} className="agent-dropdown">
               {workspaces.map(ws => (
                 <option key={ws.id} value={ws.path}>{ws.name}</option>
@@ -1441,21 +1252,25 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
           </div>
 
           {envInfo && (
-            <div className="env-info">
-              {envInfo.is_readonly && (
-                <span className="env-badge readonly" title="HARNESS_READONLY=1: 쓰기 비활성화">READ-ONLY</span>
-              )}
+            <div
+              className="env-info"
+              onClick={() => setSelectedSection('env')}
+              title="Environment 섹션 열기"
+              style={{ cursor: 'pointer' }}
+            >
+              {envInfo.is_readonly && <span className="env-badge readonly">READ-ONLY</span>}
               <span className={`env-badge ${envInfo.is_sandbox ? 'sandbox' : 'real'}`}>
                 {envInfo.is_sandbox ? 'SANDBOX' : 'REAL'}
               </span>
-              {envInfo.is_git_repo ? (
-                <span className="env-badge git" title={`${envInfo.git_commit_count}개 커밋`}>
-                  git:{envInfo.git_branch} ({envInfo.git_commit_count})
+              {envInfo.auth_path && envInfo.auth_path !== 'none' && (
+                <span className={`env-badge auth-path auth-path-${envInfo.auth_path}`}>
+                  {envInfo.auth_path === 'custom' ? '⚙' : envInfo.auth_path === 'oauth' ? '🔐' : '🔑'}
                 </span>
+              )}
+              {envInfo.is_git_repo ? (
+                <span className="env-badge git">git:{envInfo.git_branch}</span>
               ) : !envInfo.is_readonly && (
-                <button className="git-init-btn" onClick={handleGitInit} title="HERMES_HOME을 git repo로 초기화">
-                  + Git 연동
-                </button>
+                <button className="git-init-btn" onClick={e => { e.stopPropagation(); handleGitInit(); }} title="HERMES_HOME git 초기화">+ Git</button>
               )}
               <span className="env-path" title={envInfo.hermes_home}>
                 ...{envInfo.hermes_home.split("/").slice(-2).join("/")}
@@ -1466,8 +1281,13 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
           <div className="token-estimator-compact" onClick={() => setShowPayloadDetail(true)} title="클릭하여 컨텍스트 구성 상세 보기" style={{cursor:"pointer"}}>
             <div className="token-gauge-header">
               <span className="token-label">Payload</span>
-              <span className={`token-percentage-badge ${tokenStatusColor}`}>
-                {estimatedTotalTokens.toLocaleString()} / 128k ({tokenPercentage.toFixed(1)}%)
+              <span className={`token-percentage-badge ${tokenStatusColor}`}
+                title={envInfo?.context_length_source === 'estimated'
+                  ? '컨텍스트 윈도우 추정치 (이 에이전트는 모델 정보를 파일에 남기지 않음)'
+                  : envInfo?.context_length_source === 'detected'
+                  ? '설정 파일에서 탐지된 실제 값'
+                  : '기본값'}>
+                {estimatedTotalTokens.toLocaleString()} / {Math.round(MAX_CONTEXT_TOKENS/1000)}k{envInfo?.context_length_source === 'estimated' ? '~' : ''} ({tokenPercentage.toFixed(1)}%)
               </span>
             </div>
             <div className="token-progress-track">
@@ -1481,6 +1301,7 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
           >🥗</button>
         </header>
 
+        <div className="sidebar-body">
         <section className="harness-overview">
           <div className="hero-compact">
             <h2>Harness over Model</h2>
@@ -1504,7 +1325,7 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
             </div>
           )}
 
-          <div className="cards-grid">
+          <nav className="nav-list">
             {sections.map((sec) => {
               const configTypes = ["Config", "Memory Config", "Root Context", "MCP Server"];
               const count = sec.id === 'config'
@@ -1520,19 +1341,20 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
                 : sec.id === 'agent-runners'
                 ? agentRunners.filter(r => r.installed || r.state === "READY").length
                 : summary?.[sec.id] || 0;
+              const Icon = sec.Icon;
               return (
-                <div
+                <button
                   key={sec.id}
-                  className={`card ${selectedSection === sec.id ? "active" : ""}`}
+                  className={`nav-item ${selectedSection === sec.id ? "active" : ""}`}
                   onClick={() => handleSectionClick(sec.id)}
                 >
-                  <span className="card-icon">{sec.icon}</span>
-                  <span className="card-title">{sec.title}</span>
-                  <span className="card-count">{count}</span>
-                </div>
+                  <Icon size={14} className="nav-item-icon" />
+                  <span className="nav-item-label">{sec.title}</span>
+                  {count > 0 && <span className="nav-item-count">{count}</span>}
+                </button>
               );
             })}
-          </div>
+          </nav>
         </section>
 
         <main className="content-area">
@@ -1543,7 +1365,7 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
             <div className="detail-panel">
               <div className="panel-header">
                 <h3>{sections.find(s => s.id === selectedSection)?.title} Details</h3>
-                {!["web", "memory", "audit", "diff-audit", "sessions", "statedb", "checkpoints", "agent-runners"].includes(selectedSection) && (
+                {!["web", "memory", "audit", "diff-audit", "env", "sessions", "statedb", "checkpoints", "agent-runners"].includes(selectedSection) && (
                   <div className="panel-controls">
                     <input
                       className="panel-search-input"
@@ -1591,8 +1413,211 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
                 )}
 
                 {/* Memory Map Custom Layout */}
-                {selectedSection === "memory" && (
+                {selectedSection === "memory" && (() => {
+                  // ── 현재 활성 에이전트 감지 ──
+                  const agentId = workspaces.find(w => w.path === activeWorkspace)?.id || 'hermes';
+
+                  // ── 에이전트별 메모리 아키텍처 정의 ──
+                  const ARCH_MAPS = {
+                    hermes: {
+                      name: 'Hermes', subtitle: 'Hierarchical Retrieval Flow',
+                      tiers: [
+                        { label: 'L0: Active Working Context', color: '#f59e0b',
+                          lines: ['1. System Prompt (memories/MEMORY.md + memories/USER.md)', '2. Core Config (config.yaml settings)', '3. Current Session Transcript'],
+                          arrow: 'Injected every turn / System Prompt' },
+                        { label: 'L1: Pointer Index (Manifest)', color: '#4ade80',
+                          lines: ['memory_manifest.md — Global routing table for deep memory', 'Resolves PTR: tags found in L0 (e.g., PTR:Invest)'],
+                          arrow: 'Dereference via tools: read_file, skill_view, search' },
+                        { label: 'L2: Deep Storage (On-Demand)', color: '#60a5fa',
+                          lines: ['1. Procedural: ~/.hermes/skills/ (Workflows, Scripts)', '2. Historical: session_search (FTS5 SQLite Transcript DB)', '3. Semantic:   Mem0 (Vector DB, localhost:8888)', '4. State:      ~/.hermes/state/ (JSON persistence)'],
+                          arrow: 'Archived via hierarchical-memory-gc cron job' },
+                        { label: 'L3: Cold Storage (Archives)', color: '#a78bfa',
+                          lines: ['~/.hermes/reflections/ (Monthly/Yearly GC rollups)'],
+                          arrow: null },
+                      ],
+                    },
+                    claude: {
+                      name: 'Claude Code', subtitle: 'Session-Scoped Memory',
+                      tiers: [
+                        { label: 'L0: System Prompt', color: '#f59e0b',
+                          lines: ['CLAUDE.md (global) — injected every turn', 'Project-level CLAUDE.md (nearest ancestor)'],
+                          arrow: 'Auto-injected by Claude Code harness' },
+                        { label: 'L1: Project Context', color: '#4ade80',
+                          lines: ['Project-level CLAUDE.md files (per-repo)', 'AGENTS.md (multi-agent instructions)'],
+                          arrow: 'Tool calls: read_file, search_files, list_directory' },
+                        { label: 'L2: Deep Storage', color: '#60a5fa',
+                          lines: ['1. agent-memory/ (MemRosetta MCP — cross-session)', '2. ~/.claude/commands/ (slash commands)', '3. ~/.claude/agents/ (agent definitions)'],
+                          arrow: null },
+                      ],
+                    },
+                    codex: {
+                      name: 'Codex / oh-my-codex', subtitle: 'Agent-Catalog Memory',
+                      tiers: [
+                        { label: 'L0: System Prompt', color: '#f59e0b',
+                          lines: ['AGENTS.md — injected every turn', 'Ambient suggestions from ambient-suggestions/'],
+                          arrow: 'Auto-injected by oh-my-codex runtime' },
+                        { label: 'L1: Agent Catalog', color: '#4ade80',
+                          lines: ['~/.codex/agents/*.toml (specialized sub-agents)', 'Each agent has isolated role + tool scope'],
+                          arrow: 'Agent dispatch via catalog lookup' },
+                        { label: 'L2: Deep Storage', color: '#60a5fa',
+                          lines: ['1. ~/.codex/prompts/ (reusable prompt templates)', '2. ~/.codex/skills/ (task playbooks)', '3. ~/.codex/ambient-suggestions/ (inline hints)'],
+                          arrow: null },
+                      ],
+                    },
+                    gemini: {
+                      name: 'Gemini CLI', subtitle: 'Extension-Based Memory',
+                      tiers: [
+                        { label: 'L0: System Prompt', color: '#f59e0b',
+                          lines: ['GEMINI.md — injected every turn', 'Global personality + task context'],
+                          arrow: 'Auto-injected by Gemini CLI runtime' },
+                        { label: 'L1: Extensions', color: '#4ade80',
+                          lines: ['~/.gemini/antigravity-ide/ (IDE extensions)', '~/.gemini/antigravity-cli/ (CLI extensions)'],
+                          arrow: 'Loaded at session start by extension registry' },
+                        { label: 'L2: Deep Storage', color: '#60a5fa',
+                          lines: ['1. ~/.gemini/config/ (provider + model config)', '2. ~/.gemini/history/ (session history)'],
+                          arrow: null },
+                      ],
+                    },
+                    antigravity: {
+                      name: 'Antigravity', subtitle: 'Gemini Extension Layer',
+                      tiers: [
+                        { label: 'L0: System Prompt', color: '#f59e0b',
+                          lines: ['Inherited from ~/.gemini/GEMINI.md', 'Antigravity-specific tool context injected'],
+                          arrow: 'Merged with parent Gemini runtime' },
+                        { label: 'L1: Antigravity Extensions', color: '#4ade80',
+                          lines: ['antigravity-ide/ (IDE tooling overlays)', 'antigravity-cli/ (CLI command extensions)'],
+                          arrow: 'Loaded by Antigravity extension loader' },
+                        { label: 'L2: Shared Storage', color: '#60a5fa',
+                          lines: ['Shares ~/.gemini/config/ + history/ with parent', 'Extension-specific state in antigravity/state/'],
+                          arrow: null },
+                      ],
+                    },
+                    cursor: {
+                      name: 'Cursor', subtitle: 'IDE-Context Memory',
+                      tiers: [
+                        { label: 'L0: IDE Context', color: '#f59e0b',
+                          lines: ['~/.cursor/skills-cursor/ (task playbooks)', '~/.cursor/projects/ (project-level context)'],
+                          arrow: 'Injected by Cursor IDE into each composer session' },
+                        { label: 'L1: Extensions', color: '#4ade80',
+                          lines: ['~/.cursor/plugins/ (installed plugins)', '~/.cursor/extensions/ (VSCode-compatible extensions)'],
+                          arrow: 'Loaded at IDE startup via extension host' },
+                        { label: 'L2: Tracking', color: '#60a5fa',
+                          lines: ['~/.cursor/ai-tracking/ (usage metrics, history)'],
+                          arrow: null },
+                      ],
+                    },
+                    openclaw: {
+                      name: 'OpenClaw', subtitle: 'OpenClaw Memory',
+                      tiers: [
+                        { label: 'L0: System Prompt', color: '#f59e0b',
+                          lines: ['SOUL.md / AGENTS.md — injected every turn'],
+                          arrow: 'Auto-injected by OpenClaw runtime' },
+                        { label: 'L1: Skills & Config', color: '#4ade80',
+                          lines: ['~/.openclaw/skills/ (task playbooks)', '~/.openclaw/config/ (provider config)'],
+                          arrow: 'Tool dispatch via skill registry' },
+                        { label: 'L2: State', color: '#60a5fa',
+                          lines: ['~/.openclaw/state/ (session state)', '~/.openclaw/memory/ (persistent memory)'],
+                          arrow: null },
+                      ],
+                    },
+                    studio: {
+                      name: 'Agent Harness Studio', subtitle: 'Studio Self-Scan',
+                      tiers: [
+                        { label: 'L0: Project Context', color: '#f59e0b',
+                          lines: ['AGENTS.md (agent handoff docs)', 'CLAUDE.md (Claude Code instructions)', 'HANDOFF.md (session handoff notes)'],
+                          arrow: 'Loaded by dev agent at session start' },
+                        { label: 'L1: Architecture', color: '#4ade80',
+                          lines: ['docs/ (PRD, API, wireframes, architecture)', 'src/scanner/ (multi-workspace scanner modules)'],
+                          arrow: 'Referenced during development sessions' },
+                        { label: 'L2: Runtime State', color: '#60a5fa',
+                          lines: ['src/server/app.py (FastAPI, 35 endpoints)', 'harness_studio.db (SQLite audit log)', 'state.db (session + cron state)'],
+                          arrow: null },
+                      ],
+                    },
+                  };
+
+                  const arch = ARCH_MAPS[agentId] || ARCH_MAPS.hermes;
+                  const barColor = (pct) => pct > 90 ? '#ef4444' : pct > 75 ? '#f59e0b' : '#4ade80';
+
+                  // ── 에이전트별 Memory Budget 게이지 데이터 ──
+                  const gaugeBars = (() => {
+                    if (agentId === 'hermes') {
+                      const memConf = items.find(i => i.type === "Memory Config")?.metadata || {};
+                      const memLimit = memConf.memory_char_limit || 2200;
+                      const userLimit = memConf.user_char_limit || 1375;
+                      const memDir = items.filter(i => i.type === "Memory Directory" && i.name === "Agent Memories")[0];
+                      const memContent = memDir?.metadata?.md_contents?.["MEMORY.md"] || "";
+                      const userContent = memDir?.metadata?.md_contents?.["USER.md"] || "";
+                      return [
+                        { label: 'MEMORY.md', usage: memContent.length, limit: memLimit },
+                        { label: 'USER.md',   usage: userContent.length, limit: userLimit },
+                      ];
+                    }
+                    // 다른 에이전트: Root Context 파일 크기를 128K context 예산 기준으로 표시
+                    const ctxBudget = MAX_CONTEXT_TOKENS;
+                    const ctxFile = {
+                      claude: 'CLAUDE.md', codex: 'AGENTS.md',
+                      gemini: 'GEMINI.md', antigravity: 'GEMINI.md',
+                      cursor: 'skills-cursor', openclaw: 'SOUL.md', studio: 'AGENTS.md',
+                    }[agentId] || 'CLAUDE.md';
+                    const ctxItem = items.find(i => i.name === ctxFile || i.source_path?.endsWith('/' + ctxFile));
+                    const ctxSize = ctxItem?.metadata?.char_count || ctxItem?.metadata?.size_bytes || 0;
+                    return [{ label: ctxFile, usage: ctxSize, limit: ctxBudget }];
+                  })();
+
+                  return (
                   <div className="memory-map-container">
+                    {/* Memory Budget Gauge */}
+                    <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '14px 18px', marginBottom: '14px', border: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>📊 Memory Budget</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          {agentId === 'hermes' ? 'char limits from config.yaml' : '128K context window estimate'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${gaugeBars.length}, 1fr)`, gap: '12px' }}>
+                        {gaugeBars.map(({ label, usage, limit }) => {
+                          const pct = Math.min(100, Math.round((usage / limit) * 100));
+                          return (
+                            <div key={label}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
+                                <span>{label}</span>
+                                <span style={{ color: barColor(pct) }}>{usage.toLocaleString()} / {limit.toLocaleString()} ({pct}%)</span>
+                              </div>
+                              <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
+                                <div style={{ width: `${pct}%`, height: '100%', background: barColor(pct), borderRadius: '4px', transition: 'width 0.3s' }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Architecture Diagram — activeWorkspace 기반 동적 렌더링 */}
+                    <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '16px', marginBottom: '14px', border: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>🏛️ {arch.name} Memory Architecture</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{arch.subtitle}</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0', fontFamily: 'monospace', fontSize: '0.75rem', color: '#d1d5db', background: '#111', padding: '12px', borderRadius: '6px', border: '1px solid #333', overflowX: 'auto' }}>
+                        {arch.tiers.map((tier, idx) => (
+                          <div key={idx} style={{ whiteSpace: 'pre' }}>
+                            <span style={{ color: tier.color }}>{'┌──────────────── ' + tier.label + ' ─'}</span>{'\n'}
+                            {tier.lines.map((line, li) => (
+                              <span key={li}>{'│ ' + line + '\n'}</span>
+                            ))}
+                            <span style={{ color: tier.color }}>{'└' + '─'.repeat(60) + '┘'}</span>{'\n'}
+                            {tier.arrow && (
+                              <>
+                                {'                    ▲\n'}
+                                <span style={{ color: '#6b7280' }}>{'                    │ (' + tier.arrow + ')\n'}</span>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                     {memoryConflicts.length > 0 && (
                       <div className="conflict-warnings-container">
                         {memoryConflicts.map((c, idx) => (
@@ -1621,8 +1646,11 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
                               <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>No keys defined</span>
                             ) : (
                               keys.map(k => (
-                                <span key={k} className="memory-chip-item" title={`${k}: ${JSON.stringify(configMem[k])}`}>
-                                  {k}
+                                <span key={k} className="memory-chip-item" style={{display: 'flex', gap: '6px', alignItems: 'center'}}>
+                                  <strong>{k}</strong>
+                                  <span style={{opacity: 0.7, maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                                    {typeof configMem[k] === 'object' ? JSON.stringify(configMem[k]) : String(configMem[k])}
+                                  </span>
                                 </span>
                               ))
                             );
@@ -1654,6 +1682,11 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
                               <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
                                 File: memory_manifest.md ({manifest.metadata?.size_bytes} bytes)
                               </div>
+                              {manifest.metadata?.content && (
+                                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace', whiteSpace: 'pre-wrap', maxHeight: '200px', overflowY: 'auto', marginBottom: '10px', color: '#a3a3a3', border: '1px solid var(--border)' }}>
+                                  {manifest.metadata.content}
+                                </div>
+                              )}
                               <button className="edit-btn" onClick={() => handleEditClick(manifest)}>Edit Manifest</button>
                             </div>
                           ) : (
@@ -1669,30 +1702,46 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
                         </div>
                         <p className="memory-card-desc">Scanned Markdown memory files under memories/ directory:</p>
                         {(() => {
-                          const memDir = items.find(i => i.type === "Memory Directory");
-                          const files = memDir?.metadata?.md_files || [];
-                          return files.length === 0 ? (
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>No memory files found</span>
-                          ) : (
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                              {files.map((fname) => (
-                                <div key={fname} className="memory-file-row" style={{ background: 'rgba(255,255,255,0.02)', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span className="memory-file-name" style={{ flex: 1 }}>{fname}</span>
-                                  <button
-                                    className="edit-btn"
-                                    style={{ margin: 0 }}
-                                    onClick={() => handleEditClick({
-                                      name: fname.replace(/\.md$/, ''),
-                                      source_path: `${memDir.source_path}/${fname}`,
-                                      type: "Memory File",
-                                      state: "ACTIVE",
-                                      summary: "",
-                                    })}
-                                  >
-                                    Edit File
-                                  </button>
-                                </div>
-                              ))}
+                          const memDirs = items.filter(i => i.type === "Memory Directory");
+                          
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              {memDirs.length === 0 && <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>No memory directories found</span>}
+                              {memDirs.map((dir, dIdx) => {
+                                const files = dir.metadata?.md_files || [];
+                                const contents = dir.metadata?.md_contents || {};
+                                return (
+                                  <div key={dIdx} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {memDirs.length > 1 && <h5 style={{ margin: '4px 0', fontSize: '0.85rem', color: '#8b5cf6' }}>{dir.name}</h5>}
+                                    {files.map((fname) => (
+                                      <details key={fname} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                                        <summary style={{ padding: '8px 10px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', outline: 'none' }}>
+                                          <strong className="memory-file-name">{fname}</strong>
+                                          <button
+                                            className="edit-btn"
+                                            style={{ margin: 0, padding: '2px 8px' }}
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              handleEditClick({
+                                                name: fname.replace(/\.md$/, ''),
+                                                source_path: `${dir.source_path}/${fname}`,
+                                                type: "Memory File",
+                                                state: "ACTIVE",
+                                                summary: "",
+                                              });
+                                            }}
+                                          >
+                                            Edit
+                                          </button>
+                                        </summary>
+                                        <div style={{ padding: '10px', borderTop: '1px solid var(--border)', background: 'rgba(0,0,0,0.3)', fontSize: '0.8rem', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#d1d5db', maxHeight: '400px', overflowY: 'auto' }}>
+                                          {contents[fname] || 'No content or binary file.'}
+                                        </div>
+                                      </details>
+                                    ))}
+                                  </div>
+                                );
+                              })}
                             </div>
                           );
                         })()}
@@ -1707,14 +1756,20 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
                         {(() => {
                           const stateItem = items.find(i => i.type === "Memory State");
                           const files = stateItem?.metadata?.files || [];
+                          const contents = stateItem?.metadata?.contents || {};
                           return files.length === 0 ? (
                             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>No persistent state files</span>
                           ) : (
-                            <div className="memory-chips-container">
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                               {files.map(f => (
-                                <span key={f} className="memory-chip-item" style={{ background: 'rgba(100,100,255,0.05)', borderColor: 'rgba(100,100,255,0.15)' }}>
-                                  {f}
-                                </span>
+                                <details key={f} style={{ background: 'rgba(100,100,255,0.05)', borderColor: 'rgba(100,100,255,0.15)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                                  <summary style={{ padding: '6px 10px', cursor: 'pointer', fontSize: '0.8rem', outline: 'none' }}>
+                                    {f}
+                                  </summary>
+                                  <div style={{ padding: '8px', borderTop: '1px solid var(--border)', background: 'rgba(0,0,0,0.3)', fontSize: '0.7rem', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#9ca3af', maxHeight: '150px', overflowY: 'auto' }}>
+                                    {contents[f] || 'No preview available'}
+                                  </div>
+                                </details>
                               ))}
                             </div>
                           );
@@ -1722,7 +1777,8 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
                       </div>
                     </div>
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* SQLite Audit Logs Custom Layout */}
                 {selectedSection === "audit" && (
@@ -1811,156 +1867,147 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
 
                 {/* Agent Runner Panel */}
                 {selectedSection === "agent-runners" && (
-                  <div className="agent-runner-container">
-                    {/* TODO(agent-runner): evolve this from status/preview into a live
-                        transcript fed by Pi RPC/SSE run events. */}
-                    <div className="audit-timeline-header">
-                      <h4>Agent Runner — {activeWorkspaceName}</h4>
-                      <button onClick={() => fetchAgentRunners()} className="refresh-btn" disabled={agentRunnersLoading}>
-                        {agentRunnersLoading ? "Detecting…" : "Re-detect"}
-                      </button>
-                    </div>
+                  <AgentRunnerPanel />
+                )}
 
-                    {agentRunnersLoading && <div className="editor-loading">Detecting local agent runtimes…</div>}
-                    {!agentRunnersLoading && agentRunners.map((runner) => (
-                      <div key={runner.id} className="agent-runner-card">
-                        <div className="agent-runner-head">
-                          <div>
-                            <div className="agent-runner-name">{runner.name}</div>
-                            <div className="agent-runner-path">{runner.executable || "pi CLI not found"}</div>
-                          </div>
-                          <span className={`item-state state-${(runner.state || "missing").toLowerCase()}`}>
-                            {runner.state}
-                          </span>
-                        </div>
+                {/* ── Environment Section ── */}
+                {selectedSection === "env" && envInfo && (() => {
+                  const home = envInfo.hermes_home;
+                  const openFile = (name, path) => handleEditClick({ name, type: 'Config', source_path: path, state: 'active', metadata: {} });
+                  // auth → which file to open
+                  const authFile = envInfo.auth_path === 'oauth'
+                    ? { name: 'auth.json', path: `${home}/auth.json` }
+                    : envInfo.auth_path === 'custom'
+                    ? { name: 'config.yaml', path: `${home}/config.yaml` }
+                    : { name: '.env', path: `${home}/.env` };
 
-                        {runner.error ? (
-                          <div className="session-msg-error">{runner.error}</div>
+                  // config priority rows — editable ones have a path
+                  const priorityRows = [
+                    { num: 1, label: 'CLI Args',    detail: 'hermes run --flag',        path: null },
+                    { num: 2, label: 'Env Vars',    detail: '$ENV / shell export',       path: null },
+                    { num: 3, label: 'config.yaml', detail: `~/…/${home.split('/').slice(-1)[0]}/config.yaml`, path: `${home}/config.yaml` },
+                    { num: 4, label: '.env',        detail: `~/…/${home.split('/').slice(-1)[0]}/.env`,        path: `${home}/.env`         },
+                    { num: 5, label: 'Defaults',    detail: 'built-in fallback',        path: null },
+                  ];
+
+                  // all editable files
+                  const editFiles = [
+                    { name: 'config.yaml', desc: 'Provider · 모델 · 보조모델',    path: `${home}/config.yaml` },
+                    { name: '.env',        desc: 'API 키 환경변수',                path: `${home}/.env`        },
+                    { name: 'auth.json',   desc: 'OAuth 토큰 (자동 갱신)',         path: `${home}/auth.json`   },
+                    { name: 'SOUL.md',     desc: 'Hermes 시스템 프롬프트',         path: `${home}/SOUL.md`     },
+                    { name: 'AGENTS.md',   desc: '에이전트 정의',                  path: `${home}/AGENTS.md`   },
+                  ];
+
+                  return (
+                    <div className="env-section-panel">
+
+                      {/* ① 인증 상태 — 파일 클릭으로 바로 편집 */}
+                      <div className="env-section-card">
+                        <div className="env-section-card-title">인증 경로</div>
+                        {envInfo.auth_path && envInfo.auth_path !== 'none' ? (
+                          <button
+                            className="env-file-row env-auth-file-row"
+                            onClick={() => openFile(authFile.name, authFile.path)}
+                          >
+                            <span className={`env-badge auth-path auth-path-${envInfo.auth_path}`} style={{flexShrink:0}}>
+                              {envInfo.auth_path === 'custom' ? '⚙ Custom' : envInfo.auth_path === 'oauth' ? '🔐 OAuth' : '🔑 .env'}
+                            </span>
+                            <span className="env-file-name" style={{minWidth:'auto'}}>{envInfo.auth_label}</span>
+                            <code className="env-auth-detail">{authFile.path.replace(home, '~')}</code>
+                            <span className="env-file-arrow">›</span>
+                          </button>
                         ) : (
-                          <>
-                            <div className="agent-runner-grid">
-                              <div className="agent-runner-stat">
-                                <span>Version</span>
-                                <strong>{runner.version || "-"}</strong>
-                              </div>
-                              <div className="agent-runner-stat">
-                                <span>Mode</span>
-                                <strong>{runner.safety?.current_stage || "detect-only"}</strong>
-                              </div>
-                              <div className="agent-runner-stat">
-                                <span>Sessions</span>
-                                <strong>{runner.config?.session_count ?? 0}</strong>
-                              </div>
-                              <div className="agent-runner-stat">
-                                <span>Auth</span>
-                                <strong>{runner.config?.auth_configured ? "configured" : "missing"}</strong>
-                              </div>
-                              <div className="agent-runner-stat">
-                                <span>Provider</span>
-                                <strong>{runner.provider_info?.defaultProvider || "-"}</strong>
-                              </div>
-                              <div className="agent-runner-stat">
-                                <span>Model</span>
-                                <strong>{runner.provider_info?.defaultModel || "-"}</strong>
-                              </div>
-                            </div>
-
-                            <div className="agent-runner-detail">
-                              <span className="plugin-detail-label">Capabilities</span>
-                              <div className="plugin-chips">
-                                {Object.entries(runner.capabilities || {})
-                                  .filter(([, value]) => value === true)
-                                  .map(([key]) => <span key={key} className="plugin-chip plugin-chip-tool">{key}</span>)}
-                              </div>
-                            </div>
-
-                            <div className="agent-runner-detail">
-                              <span className="plugin-detail-label">Detected config</span>
-                              <div className="agent-runner-kv">
-                                <span>Agent dir</span><code>{runner.config?.agent_dir}</code>
-                                <span>Settings</span><code>{runner.config?.settings?.exists ? "present" : "missing"}</code>
-                                <span>Auth file</span><code>{runner.config?.auth?.exists ? "present" : "missing"}</code>
-                                <span>Env keys</span><code>{runner.config?.env_keys_present?.length ? runner.config.env_keys_present.join(", ") : "none"}</code>
-                              </div>
-                            </div>
-
-                            <div className="agent-runner-safe-box">
-                              <strong>Safe execution path</strong>
-                              {(runner.safety?.recommended_next || []).map((step, idx) => (
-                                <div key={idx} className="agent-runner-step">{idx + 1}. {step}</div>
-                              ))}
-                            </div>
-
-                            <div className="agent-runner-preview">
-                              <textarea
-                                value={piPreviewPrompt}
-                                onChange={(e) => setPiPreviewPrompt(e.target.value)}
-                                rows={3}
-                                placeholder="Prompt to preview for a future Pi run"
-                              />
-                              <button className="sessions-more-btn" onClick={previewPiRun} disabled={!runner.installed}>
-                                Preview RPC Command
-                              </button>
-                            </div>
-
-                            {piPreview?.loading && <div className="session-msg-loading">Preparing preview…</div>}
-                            {piPreview?.error && <div className="session-msg-error">{piPreview.error}</div>}
-                            {piPreview?.command && (
-                              <pre className="diff-stat-block">{piPreview.command.join(" ")}</pre>
-                            )}
-
-                            {/* ── Run (read-only) ── */}
-                            <div className="agent-runner-safe-box" style={{marginTop:"12px"}}>
-                              <strong>Run (read-only) — tools: read, grep, find, ls</strong>
-                              <div className="agent-runner-preview" style={{marginTop:"8px"}}>
-                                <textarea
-                                  value={piRunPrompt}
-                                  onChange={(e) => setPiRunPrompt(e.target.value)}
-                                  rows={3}
-                                  placeholder="Enter a read-only prompt for Pi…"
-                                />
-                                <div style={{display:"flex", gap:"8px", alignItems:"center", marginTop:"6px"}}>
-                                  <button
-                                    className="sessions-more-btn"
-                                    onClick={submitPiRun}
-                                    disabled={!runner.installed || piRunPolling || !piRunPrompt.trim()}
-                                  >
-                                    {piRunPolling ? "Running…" : "Run (read-only)"}
-                                  </button>
-                                  {piRunId && (
-                                    <span style={{fontSize:"11px", color:"var(--text-muted)", fontFamily:"monospace"}}>
-                                      {piRunId.slice(0, 8)}
-                                    </span>
-                                  )}
-                                  {piRunMeta?.state && (
-                                    <span className={`item-state state-${piRunMeta.state.toLowerCase()}`}>
-                                      {piRunMeta.state}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              {piRunMeta?.error && (
-                                <div className="session-msg-error" style={{marginTop:"6px"}}>{piRunMeta.error}</div>
-                              )}
-                              {piRunLog && (
-                                <pre className="diff-stat-block" style={{marginTop:"8px", maxHeight:"320px", overflowY:"auto", whiteSpace:"pre-wrap", wordBreak:"break-all"}}>
-                                  {piRunLog}
-                                </pre>
-                              )}
-                              {piRunMeta?.post_audit && (
-                                <div style={{marginTop:"8px", fontSize:"12px", color:"var(--text-muted)"}}>
-                                  Post-audit: {piRunMeta.post_audit.file_count} files changed
-                                  {piRunMeta.post_audit.stat && (
-                                    <pre className="diff-stat-block" style={{marginTop:"4px"}}>{piRunMeta.post_audit.stat}</pre>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </>
+                          <div className="env-auth-row">
+                            <span className="env-badge" style={{opacity:0.5}}>없음</span>
+                            <span style={{fontSize:'0.7rem',color:'var(--text-secondary)'}}>API 키 또는 인증 파일이 감지되지 않았습니다</span>
+                          </div>
+                        )}
+                        {envInfo.aux_models_missing?.length > 0 && (
+                          <button
+                            className="env-file-row"
+                            style={{marginTop:4}}
+                            onClick={() => openFile('config.yaml', `${home}/config.yaml`)}
+                          >
+                            <span className="env-badge aux-warn" style={{flexShrink:0}}>⚠ AUX</span>
+                            <span className="env-file-desc">보조 모델 미설정: {envInfo.aux_models_missing.join(', ')}</span>
+                            <span className="env-file-arrow">›</span>
+                          </button>
                         )}
                       </div>
-                    ))}
-                  </div>
+
+                      {/* ② 설정 우선순위 — 파일 있는 항목만 클릭 편집 */}
+                      <div className="env-section-card">
+                        <div className="env-section-card-title">설정 우선순위 (높음 → 낮음)</div>
+                        <div className="env-hierarchy">
+                          {priorityRows.map(row =>
+                            row.path ? (
+                              <button
+                                key={row.num}
+                                className="env-hier-step env-hier-step-btn"
+                                onClick={() => openFile(row.label, row.path)}
+                              >
+                                <span className="env-hier-num">{row.num}</span>
+                                <span className="env-hier-label">{row.label}</span>
+                                <span className="env-hier-detail">{row.detail}</span>
+                                <span className="env-file-arrow" style={{marginLeft:'auto',opacity:.4}}>›</span>
+                              </button>
+                            ) : (
+                              <div key={row.num} className="env-hier-step env-hier-step-static">
+                                <span className="env-hier-num" style={{opacity:.4}}>{row.num}</span>
+                                <span className="env-hier-label" style={{opacity:.5}}>{row.label}</span>
+                                <span className="env-hier-detail">{row.detail}</span>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </div>
+
+                      {/* ③ 워크스페이스 정보 */}
+                      <div className="env-section-card">
+                        <div className="env-section-card-title">워크스페이스</div>
+                        <div className="env-info-grid">
+                          <span className="env-info-key">경로</span>
+                          <code
+                            className="env-info-val env-copy-val"
+                            title="클릭하여 복사"
+                            onClick={() => navigator.clipboard?.writeText(home)}
+                          >{home}</code>
+                          <span className="env-info-key">모드</span>
+                          <span className="env-info-val">
+                            {envInfo.is_sandbox
+                              ? <span className="env-badge sandbox">SANDBOX</span>
+                              : <span className="env-badge real">REAL</span>}
+                            {envInfo.is_readonly && <span className="env-badge readonly" style={{marginLeft:4}}>READ-ONLY</span>}
+                          </span>
+                          {envInfo.is_git_repo && (<>
+                            <span className="env-info-key">브랜치</span>
+                            <span className="env-info-val"><span className="env-badge git">git:{envInfo.git_branch}</span></span>
+                          </>)}
+                        </div>
+                      </div>
+
+                      {/* ④ 모든 편집 파일 */}
+                      <div className="env-section-card">
+                        <div className="env-section-card-title">파일 편집</div>
+                        {editFiles.map(f => (
+                          <button
+                            key={f.name}
+                            className="env-file-row"
+                            onClick={() => openFile(f.name, f.path)}
+                          >
+                            <span className="env-file-name">{f.name}</span>
+                            <span className="env-file-desc">{f.desc}</span>
+                            <span className="env-file-arrow">›</span>
+                          </button>
+                        ))}
+                      </div>
+
+                    </div>
+                  );
+                })()}
+                {selectedSection === "env" && !envInfo && (
+                  <div className="chat-empty">환경 정보를 불러오는 중...</div>
                 )}
 
                 {/* ── Sessions Dashboard ── */}
@@ -2178,7 +2225,7 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
                 })()}
 
                 {/* ── Generic items — MCP: ERROR 상단 정렬, Cron/Plugin: 확장 상세, 검색 필터 ── */}
-                {selectedSection !== "memory" && selectedSection !== "audit" && selectedSection !== "diff-audit" && selectedSection !== "sessions" && selectedSection !== "statedb" && selectedSection !== "skills" && selectedSection !== "checkpoints" && selectedSection !== "agent-runners" && (() => {
+                {selectedSection !== "memory" && selectedSection !== "audit" && selectedSection !== "diff-audit" && selectedSection !== "env" && selectedSection !== "sessions" && selectedSection !== "statedb" && selectedSection !== "skills" && selectedSection !== "checkpoints" && selectedSection !== "agent-runners" && (() => {
                   let displayItems = getFilteredSortedItems();
                   if (selectedSection === "mcp") {
                     displayItems = [...displayItems].sort((a, b) => {
@@ -2422,176 +2469,13 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
             </div>
           )}
         </main>
+        </div>
       </aside>
 
       {/* Resize Handle */}
       <div className="resize-handle" onMouseDown={handleResizeStart} />
 
-      {/* Right Column: Chat Molder Interface */}
-      <section className="chat-container" style={chatWidth ? { flex: `0 0 ${chatWidth}px` } : undefined}>
-        <header className="chat-header">
-          <div className="chat-title-block">
-            <h3>✨ Chat Molder</h3>
-            <div className="pi-mode-toggle">
-              <button
-                className={`pi-toggle-btn${!piMode ? " active" : ""}`}
-                onClick={() => setPiMode(false)}
-                title="Direct LLM call — fast, no tool access"
-              >LLM</button>
-              <button
-                className={`pi-toggle-btn${piMode ? " active" : ""}`}
-                onClick={() => setPiMode(true)}
-                title="Pi Coding Agent — can read files, search code"
-              >Pi Agent</button>
-            </div>
-            {piMode && piMoldSessionFile && (
-              <button
-                className="pi-toggle-btn"
-                style={{fontSize:"11px", padding:"3px 8px", opacity:0.7}}
-                onClick={() => {
-                  setPiMoldSessionFile(null);
-                  setChatHistory([]);
-                  setMolderResponse(null);
-                }}
-                title="Pi 세션을 초기화하고 새 대화 시작"
-              >새 대화</button>
-            )}
-          </div>
-          <div className="llm-provider-card">
-            <div className="llm-provider-main">
-              <span className="llm-provider-label">LLM</span>
-              <strong>{llmProvider?.provider || "Unknown"}</strong>
-              <span className="llm-provider-model">{llmProvider?.model || "model?"}</span>
-            </div>
-            <button
-              className="llm-edit-btn"
-              onClick={() => setShowLlmSettings(v => !v)}
-              title="Edit LLM provider"
-            >
-              Edit
-            </button>
-          </div>
-        </header>
-
-        {showLlmSettings && (
-          <div className="llm-settings-panel">
-            <label>
-              Provider
-              <select
-                value={LLM_PROVIDER_PRESETS.some(p => p.provider === llmDraft.provider) ? llmDraft.provider : "Custom"}
-                onChange={e => handleLlmPresetChange(e.target.value)}
-              >
-                {LLM_PROVIDER_PRESETS.map(preset => (
-                  <option key={preset.provider} value={preset.provider}>{preset.provider}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Endpoint
-              <input
-                value={llmDraft.base_url}
-                onChange={e => setLlmDraft(v => ({ ...v, base_url: e.target.value }))}
-                placeholder="http://localhost:20128/v1"
-              />
-            </label>
-            <label>
-              Model
-              <input
-                value={llmDraft.model}
-                onChange={e => setLlmDraft(v => ({ ...v, model: e.target.value }))}
-                placeholder="harness-model"
-              />
-            </label>
-            <label>
-              API Key
-              <input
-                type="password"
-                value={llmDraft.api_key}
-                onChange={e => setLlmDraft(v => ({ ...v, api_key: e.target.value }))}
-                placeholder={llmProvider?.api_key_set ? "Configured - leave blank to keep" : "optional"}
-              />
-            </label>
-            <div className="llm-settings-actions">
-              <span>{llmStatus}</span>
-              <button onClick={() => setShowLlmSettings(false)}>Cancel</button>
-              <button className="save-btn" onClick={saveLlmProvider}>Save</button>
-            </div>
-          </div>
-        )}
-
-        <div className="chat-messages" ref={chatMessagesRef}>
-          {chatHistory.length === 0 && (
-            <div className="chat-empty">
-              <p>Harness molding is a dialogue. Describe a skill, memory, or logic you want to add to your agent.</p>
-            </div>
-          )}
-          {chatHistory.map((msg, i) => (
-            <div key={i} className={`chat-bubble ${msg.role}`}>
-              <div className="bubble-content">
-                {msg.role === "assistant" ? (
-                  <>
-                    {msg.data?.web_search && <div className="web-search-used">Auto web search used</div>}
-                    {msg.piRun && <div className="web-search-used" style={{background:"#6366f1",color:"#fff"}}>Pi Agent (read · grep · find · ls · web_search)</div>}
-                    <MarkdownContent text={msg.text} />
-                    {msg.mentionedFiles?.length > 0 && (
-                      <div style={{marginTop:"8px", display:"flex", flexWrap:"wrap", gap:"6px"}}>
-                        {msg.mentionedFiles.map(fp => (
-                          <button
-                            key={fp}
-                            className="sessions-more-btn"
-                            style={{fontSize:"11px", padding:"3px 8px"}}
-                            onClick={() => {
-                              fetchFileContent({source_path: fp, name: fp.split("/").pop()});
-                              setSelectedSection(null);
-                            }}
-                            title={fp}
-                          >
-                            📄 {fp.split("/").pop()}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  msg.text
-                )}
-                {msg.data && msg.data.diff && (
-                  <div className="chat-proposal">
-                    <pre className="diff-viewer">{msg.data.diff}</pre>
-                    <button className="apply-btn" onClick={() => handleApply(msg.data)}>Apply Changes</button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-          {molderResponse?.status === "loading" && (
-             <div className="chat-bubble assistant">
-               <div className="bubble-content loading-dots">
-                 {piMoldPolling ? "Pi Agent 실행 중 (read · grep · find · ls)…" : "Thinking..."}
-               </div>
-             </div>
-          )}
-        </div>
-
-        <footer className="chat-footer">
-          <div className="chat-input-box">
-            <input
-              type="text"
-              placeholder="Suggest a skill or memory..."
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
-                e.preventDefault();
-                handleMold();
-              }}
-            />
-            <button onClick={handleMold} disabled={!prompt.trim() || molderResponse?.status === "loading" || piMoldPolling}>
-              {piMoldPolling ? "Pi 실행 중…" : piMode ? "Pi로 보내기" : "Send"}
-            </button>
-          </div>
-        </footer>
-      </section>
+      <ChatPanel chatWidth={chatWidth} sections={sections} onEditFile={handleEditClick} />
 
       {/* Payload Detail Modal */}
       {showPayloadDetail && (() => {
@@ -2620,7 +2504,7 @@ I am a versatile creative copywriter and technical writer focusing on high-quali
               <div className="payload-modal-header">
                 <span className="payload-modal-title">컨텍스트 구성 상세</span>
                 <span className={`token-percentage-badge ${tokenStatusColor}`} style={{fontSize:"13px"}}>
-                  {estimatedTotalTokens.toLocaleString()} / 128k ({tokenPercentage.toFixed(1)}%)
+                  {estimatedTotalTokens.toLocaleString()} / {Math.round(MAX_CONTEXT_TOKENS/1000)}k ({tokenPercentage.toFixed(1)}%)
                 </span>
                 <button className="payload-modal-close" onClick={() => setShowPayloadDetail(false)}>✕</button>
               </div>

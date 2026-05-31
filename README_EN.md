@@ -127,14 +127,17 @@ graph TD
 ```
 
 ### Main API Endpoints Flow
-| Component | Endpoint | Role |
-|-----------|----------|------|
-| **Scanner** | `GET /api/scan` | Full harness scan by workspace |
-| **File I/O** | `GET /api/read`<br>`POST /api/save` | Read content / Auto-backup + Write + Git commit |
-| **AI Chat** | `POST /api/mold` | Call LLM proxy via OpenAI SDK |
-| **Git** | `POST /api/git/*` | Init, log, diff, rollback handling |
-| **Converter** | `POST /api/convert/*` | Claude Code ↔ Hermes skill conversion and injection |
-| **Runner**| `POST /api/pi/runs` | Pi Agent read-only execution |
+| Component | Router | Endpoint | Role |
+|-----------|--------|----------|------|
+| **Scanner** | `routers/scan.py` | `GET /api/scan` | Full harness scan by workspace |
+| **File I/O** | `routers/files.py` | `GET /api/read`<br>`POST /api/save` | Read content / Auto-backup + Write + Git commit |
+| **AI Chat** | `routers/mold.py` | `POST /api/mold` | Async httpx → LLM proxy call |
+| **Git** | `routers/git.py` | `POST /api/git/*` | Init, log, diff, rollback handling |
+| **Converter** | `routers/convert.py` | `POST /api/convert/*` | Claude Code ↔ Hermes skill conversion and injection |
+| **Runner**| `routers/pi.py` | `POST /api/pi/runs` | Pi Agent read-only execution |
+| **Toggle** | `routers/toggle.py` | `POST /api/toggle` | Enable/disable hooks and MCP servers |
+| **Watch** | `routers/watch.py` | `GET /api/watch/events` | SSE real-time file change events |
+| **Install** | `routers/install.py` | `POST /api/install/skill` | Install skill from GitHub URL |
 
 ---
 
@@ -191,10 +194,14 @@ HERMES_HOME=~/.hermes ./run.sh
 ```bash
 # Backend only (with hot reload)
 source .venv/bin/activate
-HERMES_HOME=~/.hermes/sandbox python -m uvicorn src.server.app:app --port 8766 --reload
+HERMES_HOME=~/.hermes/sandbox python -m uvicorn src.server.main:app --port 8766 --reload
 
 # Frontend only (separate terminal)
 cd src/ui && npx vite
+
+# Run tests (66 tests)
+source .venv/bin/activate
+python -m pytest tests/ -v
 ```
 
 ---
@@ -248,6 +255,15 @@ cd src/ui && npx vite
 | `GET` | `/api/audit/logs` | SQLite audit trail |
 | `POST` | `/api/convert/skill` | Convert skills between Hermes ↔ Claude Code formats |
 
+### Toggle / Watch / Install
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/toggle` | Enable/disable hooks and MCP servers |
+| `GET` | `/api/watch/events` | SSE real-time file change events (watchdog + polling fallback) |
+| `GET` | `/api/watch/status` | File watching mode status |
+| `POST` | `/api/install/skill` | Install skill from GitHub URL |
+
 > Full API documentation: [docs/api.md](docs/api.md)
 
 ---
@@ -256,11 +272,37 @@ cd src/ui && npx vite
 
 ```
 agent-harness-studio/
+├── .github/
+│   └── workflows/
+│       └── ci.yml                     # CI pipeline (lint + test)
 ├── src/
 │   ├── scanner/
-│   │   └── hermes_scanner.py        # Core: ~/.hermes scan engine
+│   │   └── hermes_scanner.py        # Core: ~/.hermes scan engine (1,053 LOC)
 │   ├── server/
-│   │   ├── app.py                   # FastAPI main app (all endpoints)
+│   │   ├── main.py                  # FastAPI entry point (86 LOC, global error handlers)
+│   │   ├── app.py                   # Backward-compat re-export
+│   │   ├── routers/                 # API endpoints (14 files, 2,462 LOC)
+│   │   │   ├── scan.py              #   /api/scan, /api/workspaces
+│   │   │   ├── mold.py              #   /api/mold (Chat Molder)
+│   │   │   ├── pi.py                #   /api/pi/* (Agent Runner)
+│   │   │   ├── git.py               #   /api/git/* (Git integration)
+│   │   │   ├── convert.py           #   /api/convert/* (Skill Converter)
+│   │   │   ├── files.py             #   /api/read, /api/save, /api/rollback
+│   │   │   ├── actions.py           #   /api/actions/*
+│   │   │   ├── toggle.py            #   /api/toggle (Hook/MCP enable/disable)
+│   │   │   ├── watch.py             #   /api/watch/events (SSE file watching)
+│   │   │   ├── install.py           #   /api/install/skill (GitHub URL skill install)
+│   │   │   ├── sessions.py          #   /api/sessions/*
+│   │   │   ├── env.py               #   /api/env
+│   │   │   ├── web.py               #   /api/web/scrape
+│   │   │   └── audit.py             #   /api/audit/logs
+│   │   ├── services/                # Business logic (4 files, 770 LOC)
+│   │   │   ├── config.py            #   HERMES_HOME, readonly, path validation, backup
+│   │   │   ├── git.py               #   git integration utilities
+│   │   │   ├── llm.py               #   LLM client + async call (httpx)
+│   │   │   └── pi.py                #   Pi Agent execution utilities
+│   │   ├── usage_tracker.py         # Claude/Codex usage parser
+│   │   ├── recommender.py           # Smart Diet recommendation engine
 │   │   └── scrapers/                # Hybrid Web Scraper pipeline
 │   │       ├── hybrid.py            # 4-phase orchestrator
 │   │       ├── firecrawl_scraper.py
@@ -269,14 +311,34 @@ agent-harness-studio/
 │   │       └── browser_scraper.py
 │   └── ui/
 │       └── src/
-│           ├── App.jsx              # Main React component
+│           ├── App.jsx              # Main React component (2,775 LOC)
 │           ├── App.css              # Styling (dark theme)
-│           └── ScrapingPipeline.jsx # Web scraping results display
+│           ├── components/          # Extracted UI components (5)
+│           │   ├── EditorErrorBoundary.jsx
+│           │   ├── MarkdownContent.jsx
+│           │   ├── MolderMessage.jsx
+│           │   ├── ChatPanel.jsx
+│           │   └── AgentRunnerPanel.jsx
+│           ├── stores/              # Zustand state management (4)
+│           │   ├── useHarnessStore.js
+│           │   ├── useEditorStore.js
+│           │   ├── useChatStore.js
+│           │   └── useAgentRunnerStore.js
+│           ├── ArchitectureGraph.jsx # Architecture diagram
+│           └── ScrapingPipeline.jsx  # Web scraping results
+├── tests/                           # Test suite (66 tests)
+│   ├── conftest.py                  # pytest fixtures + ASGI client
+│   ├── pytest.ini                   # asyncio_mode = auto
+│   ├── api/
+│   │   ├── test_endpoints.py        # API tests (18)
+│   │   └── test_routers.py          # Router integration tests (26)
+│   ├── test_scanner.py              # Scanner tests (10)
+│   ├── test_services.py             # Service tests (3)
+│   └── test_install.py              # Skill install tests (9)
 ├── docs/
 │   ├── api.md                       # API reference
 │   ├── prd.md                       # Product requirements
 │   ├── git-safety.md                # Git safety guide
-│   ├── firecrawl-vs-insane-search.md # Scraper comparison
 │   └── assets/
 │       ├── architecture.svg
 │       └── agent-harness-studio-intro.mp4
@@ -303,6 +365,9 @@ httpx>=0.27.0           # Async HTTP (Jina scraper)
 curl_cffi>=0.7.0        # Phase 3 TLS scraper
 playwright>=1.44.0      # Phase 4 browser scraper
 markdownify>=0.12.0     # HTML → Markdown conversion
+watchdog>=4.0.0         # Real-time file watching (optional, polling fallback without it)
+pytest>=8.0.0           # Test framework
+pytest-asyncio>=0.24.0  # Async test support
 ```
 
 ---
@@ -330,7 +395,7 @@ OPENAI_API_KEY=sk-...
 - **Single-user**: No authentication. Intended for localhost use only.
 - **Large skill directories**: Scanning >100 skills may be slow (synchronous processing).
 - **Browser scraper**: Requires `playwright install chromium` for Phase 4.
-- **No real-time file watching**: Changes require manual refresh.
+- **Watchdog optional**: Real-time file watching works with `watchdog` installed. Falls back to polling without it (lower performance).
 
 ---
 
@@ -345,8 +410,6 @@ OPENAI_API_KEY=sk-...
 Contributions are welcome! Areas of interest:
 
 - Multi-agent support (Claude Code, Codex, etc.)
-- Real-time file watching via WebSocket/SSE
-- Hook/MCP enable/disable toggle UI
 - Harness Preset Gallery
 - Diff side-by-side preview
 

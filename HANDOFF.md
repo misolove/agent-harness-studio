@@ -2,11 +2,57 @@
 
 > 다음 에이전트가 이어받을 수 있도록 작성된 핸드오프 문서.
 > **작업할 때마다 업데이트할 것.**
-> Last updated: 2026-05-27 (문서 동기화 완료)
+> Last updated: 2026-05-31 (기능 확장 및 품질 개선)
 
 ---
 
-## ✅ 최근 완료 — Usage Telemetry A안
+## ✅ 최근 완료 — 기능 확장 및 품질 개선 (2026-05-31)
+
+**상태**: 구현 및 검증 완료
+**핵심**: 8개 개선 사항 구현 (신규 기능 3개 + 품질 5개)
+
+구현 파일:
+- `src/server/routers/toggle.py` — POST /api/toggle (MCP/훅 enable/disable, 100줄)
+- `src/server/routers/watch.py` — GET /api/watch/events SSE (파일 감시, 164줄)
+- `src/server/routers/install.py` — POST /api/install/skill (URL 설치, 157줄)
+- `src/server/main.py` — 글로벌 예외 핸들러 4종 추가 (86줄)
+- `.github/workflows/ci.yml` — CI 파이프라인 (pytest + vite build)
+- `src/ui/src/App.jsx` — ChatPanel + AgentRunnerPanel 컴포넌트 연동 (2,775줄)
+- `src/ui/src/stores/*.js` — 4개 스토어 완전한 API 보완
+- `tests/api/test_routers.py` — 26개 라우터 통합 테스트
+- `tests/test_install.py` — 9개 스킬 설치 테스트
+- `requirements.txt` — watchdog, pytest, pytest-asyncio 추가
+
+검증 결과:
+- `python -m pytest tests/ -v` → 66 passed, 0 failed
+- `cd src/ui && npx vite build` → 성공 (358KB JS, 59KB CSS)
+
+---
+
+## ✅ 이전 완료 — 백엔드 모듈 분리 + 테스트 (2026-05-31)
+
+**상태**: 리팩토링 및 검증 완료
+**핵심**: 모놀리식 `app.py` (2,822줄) → `main.py` + 11개 라우터 + 4개 서비스로 분리
+
+구현 파일:
+- `src/server/main.py` — FastAPI 진입점 (52줄)
+- `src/server/app.py` — 하위 호환 리다이렉터 (5줄)
+- `src/server/routers/` — 11개 라우터 (2,049줄)
+  - scan, mold, pi, git, convert, files, actions, sessions, env, web, audit
+- `src/server/services/` — 4개 서비스 (770줄)
+  - config, git, llm, pi
+- `src/ui/src/stores/` — 4개 Zustand 스토어 (288줄)
+- `src/ui/src/components/` — 5개 React 컴포넌트 (925줄)
+- `tests/` — 31개 테스트 (API 18 + 스캐너 10 + 서비스 3)
+
+검증 결과:
+- `python -m pytest tests/ -v` → 31 passed, 0 failed
+- `cd src/ui && npx vite build` → 성공 (345KB JS, 59KB CSS)
+- `run.sh` → `src.server.main:app`로 업데이트
+
+---
+
+## ✅ 이전 완료 — Usage Telemetry A안
 
 **상태**: 구현 및 검증 완료
 **문서**: [`docs/usage-telemetry-spec.md`](docs/usage-telemetry-spec.md)
@@ -111,10 +157,18 @@ source .venv/bin/activate
 - `src/scanner/base_scanner.py` — 공통 scanner base와 기본 log/session/state/checkpoint surface
 - `src/scanner/hermes_scanner.py` — `~/.hermes` 전용 상세 스캔 로직
 - `src/scanner/claude_scanner.py`, `codex_scanner.py`, `cursor_scanner.py`, `openclaw_scanner.py`, `gemini_cli_scanner.py`, `antigravity_scanner.py`, `studio_scanner.py` — 워크스페이스별 스캐너
-- `src/server/app.py` — FastAPI 엔드포인트
-- `src/server/usage_tracker.py`, `src/server/recommender.py` — Usage Telemetry + Smart Diet 추천 엔진
+- `src/server/routers/mold.py` — `/api/mold` (Chat Molder)
+- `src/server/routers/scan.py` — `/api/scan`, `/api/workspaces`
+- `src/server/services/config.py` — HERMES_HOME, readonly, 경로 검증
+- `src/server/services/llm.py` — LLM 클라이언트 + 비동기 호출
+- `src/server/services/git.py` — git 연동 유틸리티
+- `src/server/services/pi.py` — Pi Agent 실행 유틸리티
+- `src/server/usage_tracker.py` — Usage 파서
+- `src/server/recommender.py` — Smart Diet 추천 엔진
 - `src/ui/src/App.jsx` — React 메인 컴포넌트
 - `src/ui/src/App.css` — 스타일
+- `src/ui/src/stores/` — Zustand 상태 관리 (4개)
+- `src/ui/src/components/` — 추출된 UI 컴포넌트 (5개)
 - `docs/agent-runner-pi.md` — Pi Coding Agent adapter 설계/핸드오프
 - `docs/product-assessment-and-skill-converter.md` — 제품성 평가 + Skill Converter 설계/구현 상태
 - `docs/usage-telemetry-spec.md` — Usage Telemetry A안 구현 스펙
@@ -344,33 +398,44 @@ skills/bundles/memory/mcp/context/hooks/cron/plugins/logs/sessions/statedb/check
 Other scanners normalize their native files into the same item schema so the UI can reuse one dashboard.
 ```
 
-### API 엔드포인트
+### API 엔드포인트 (routers/ 기준)
 ```
-GET  /api/workspaces            → 감지 가능한 agent workspace 목록
-GET  /api/scan                  → 전체 스캔 결과 + summary
-GET  /api/scan/{section}        → 섹션별 필터링
-GET  /api/read?path=...         → 파일 내용 읽기(max_bytes/tail 지원)
-POST /api/save                  → 파일 저장 (+ git commit 시도)
-POST /api/rollback              → 백업 복원
-POST /api/mold                  → Chat Molder (LLM 제안)
-GET  /api/reference/hermes      → Molder에 주입되는 Hermes reference context
-GET  /api/usage/stats           → Skill/Subagent 사용량 telemetry
-GET  /api/recommendations       → Usage-aware Smart Diet 추천
-POST /api/actions/archive       → 항목 archive 이동
-POST /api/actions/copy          → 항목 다른 workspace로 copy
-POST /api/convert/skill         → Claude/Hermes skill 변환 preview
-POST /api/convert/skill/inject  → Claude skill을 Hermes skill로 dry-run/write 주입
-GET  /api/agent-runners          → local agent runtime status list
-GET  /api/pi/status              → Pi CLI/config/capability status (provider_info 포함)
-POST /api/pi/preview             → safe Pi command preview only (no execution)
-POST /api/pi/runs                → Pi read-only run 시작 (mode=read_only 강제)
-GET  /api/pi/runs/{id}           → run 상태 조회
-GET  /api/pi/runs/{id}/log       → stdout+stderr tail
-POST /api/pi/runs/{id}/stop      → SIGTERM 전송
-POST /api/pi/mold                → Chat Molder Pi Agent mode
-GET  /api/sessions/list          → state.db sessions 목록
-GET  /api/sessions/messages      → session messages
-GET  /api/git/audit              → workspace git diff/risk audit
+GET  /api/workspaces            → routers/scan.py
+GET  /api/scan                  → routers/scan.py (전체 스캔 결과 + summary)
+GET  /api/scan/{section}        → routers/scan.py (섹션별 필터링)
+GET  /api/read?path=...         → routers/files.py (max_bytes/tail 지원)
+POST /api/save                  → routers/files.py (+ git commit 시도)
+POST /api/rollback              → routers/files.py
+POST /api/mold                  → routers/mold.py (Chat Molder, 비동기 LLM)
+GET  /api/reference/hermes      → routers/scan.py
+GET  /api/usage/stats           → routers/scan.py
+GET  /api/recommendations       → routers/scan.py
+POST /api/actions/archive       → routers/actions.py
+POST /api/actions/copy          → routers/actions.py
+POST /api/convert/skill         → routers/convert.py
+POST /api/convert/skill/inject  → routers/convert.py
+GET  /api/agent-runners          → routers/scan.py
+GET  /api/pi/status              → routers/pi.py
+POST /api/pi/preview             → routers/pi.py
+POST /api/pi/runs                → routers/pi.py (mode=read_only 강제)
+GET  /api/pi/runs/{id}           → routers/pi.py
+GET  /api/pi/runs/{id}/log       → routers/pi.py
+POST /api/pi/runs/{id}/stop      → routers/pi.py
+POST /api/pi/mold                → routers/pi.py
+GET  /api/sessions/list          → routers/sessions.py
+GET  /api/sessions/messages      → routers/sessions.py
+GET  /api/git/audit              → routers/git.py
+POST /api/git/init               → routers/git.py
+GET  /api/git/log                → routers/git.py
+GET  /api/git/diff               → routers/git.py
+POST /api/git/rollback           → routers/git.py
+GET  /api/env                    → routers/env.py
+GET  /api/audit/logs             → routers/audit.py
+POST /api/web/scrape             → routers/web.py
+POST /api/toggle                 → routers/toggle.py (MCP/훅 enable/disable)
+GET  /api/watch/events           → routers/watch.py (SSE 파일 감시)
+POST /api/install/skill          → routers/install.py (URL 스킬 설치)
+GET  /health                     → main.py
 ```
 
 ### SECTION_TYPE_MAP (app.py)
@@ -398,9 +463,21 @@ GET  /api/git/audit              → workspace git diff/risk audit
 ## 6. 테스트 방법
 
 ```bash
-# 스캐너 직접 실행
+# 전체 테스트 실행 (66개)
 cd ~/agent-harness-studio
 source .venv/bin/activate
+python -m pytest tests/ -v
+
+# API 테스트만
+python -m pytest tests/api/ -v
+
+# 스캐너 테스트만
+python -m pytest tests/test_scanner.py -v
+
+# 프론트엔드 빌드 검증
+cd src/ui && npx vite build
+
+# 스캐너 직접 실행
 python -m src.scanner.hermes_scanner | python3 -c "
 import json, sys
 from collections import Counter

@@ -147,32 +147,39 @@ graph TD
     end
 
     subgraph Backend["FastAPI 백엔드 (localhost:8766)"]
-        API["API 라우터<br/>(/api/scan, /api/save, /api/mold 등)"]
+        Main["main.py (진입점)"]
+        Routers["routers/ (11개 모듈)"]
+        Services["services/ (config, git, llm, pi)"]
     end
     
     subgraph LocalEnv["로컬 환경"]
         Hermes["~/.hermes<br/>(또는 HERMES_HOME)"]
-        LLM["LLM proxy (localhost:20128)<br/>모델: harness-model"]
+        LLM["LLM proxy (localhost:20128)<br/>→ OpenAI API 폴백"]
         Scraper["하이브리드 웹 스크래퍼<br/>(Firecrawl, Jina, TLS, Playwright)"]
     end
 
-    L -->|HTTP Fetch| API
-    R -->|HTTP Fetch| API
+    L -->|HTTP Fetch| Main
+    R -->|HTTP Fetch| Main
+    Main --> Routers
+    Routers --> Services
     
-    API -->|파일 읽기/쓰기/스캔| Hermes
-    API -->|OpenAI SDK| LLM
-    API -->|웹 스크래핑 요청| Scraper
+    Routers -->|파일 읽기/쓰기/스캔| Hermes
+    Services -->|httpx.AsyncClient| LLM
+    Routers -->|웹 스크래핑 요청| Scraper
 ```
 
 ### 주요 API 엔드포인트 흐름
-| 컴포넌트 | 엔드포인트 | 역할 |
-|----------|------------|------|
-| **스캐너** | `GET /api/scan` | workspace별 전체 하네스 스캔 |
-| **파일IO** | `GET /api/read`<br>`POST /api/save` | 파일 내용 읽기 / 백업+쓰기+git 커밋 |
-| **AI 챗** | `POST /api/mold` | OpenAI SDK → LLM proxy 호출 |
-| **Git** | `POST /api/git/*` | init, log, diff, rollback 처리 |
-| **변환기** | `POST /api/convert/*` | Claude Code ↔ Hermes 스킬 변환 및 주입 |
-| **Runner**| `POST /api/pi/runs` | Pi Agent read-only 실행 |
+| 컴포넌트 | 라우터 | 엔드포인트 | 역할 |
+|----------|--------|------------|------|
+| **스캐너** | `routers/scan.py` | `GET /api/scan` | workspace별 전체 하네스 스캔 |
+| **파일IO** | `routers/files.py` | `GET /api/read`<br>`POST /api/save` | 파일 내용 읽기 / 백업+쓰기+git 커밋 |
+| **AI 챗** | `routers/mold.py` | `POST /api/mold` | httpx 비동기 → LLM proxy 호출 |
+| **Git** | `routers/git.py` | `POST /api/git/*` | init, log, diff, rollback 처리 |
+| **변환기** | `routers/convert.py` | `POST /api/convert/*` | Claude Code ↔ Hermes 스킬 변환 및 주입 |
+| **Runner**| `routers/pi.py` | `POST /api/pi/runs` | Pi Agent read-only 실행 |
+| **토글** | `routers/toggle.py` | `POST /api/toggle` | 훅/MCP 활성화/비활성화 |
+| **감시** | `routers/watch.py` | `GET /api/watch/events` | SSE 실시간 파일 변경 이벤트 |
+| **설치** | `routers/install.py` | `POST /api/install/skill` | GitHub URL에서 스킬 설치 |
 
 ---
 
@@ -229,10 +236,14 @@ HERMES_HOME=~/.hermes ./run.sh
 ```bash
 # 백엔드만 실행 (핫 리로드)
 source .venv/bin/activate
-HERMES_HOME=~/.hermes/sandbox python -m uvicorn src.server.app:app --port 8766 --reload
+HERMES_HOME=~/.hermes/sandbox python -m uvicorn src.server.main:app --port 8766 --reload
 
 # 프론트엔드만 실행 (별도 터미널)
 cd src/ui && npx vite
+
+# 테스트 실행 (66개)
+source .venv/bin/activate
+python -m pytest tests/ -v
 ```
 
 ---
@@ -310,6 +321,15 @@ cd src/ui && npx vite
 | `GET` | `/api/sessions/list` | state.db 세션 목록 |
 | `GET` | `/api/sessions/messages` | 특정 세션 메시지 |
 
+### Toggle / Watch / Install
+
+| 메서드 | 엔드포인트 | 설명 |
+|--------|-----------|------|
+| `POST` | `/api/toggle` | 훅/MCP 서버 활성화/비활성화 |
+| `GET` | `/api/watch/events` | SSE 실시간 파일 변경 이벤트 (watchdog + polling 폴백) |
+| `GET` | `/api/watch/status` | 파일 감시 모드 상태 확인 |
+| `POST` | `/api/install/skill` | GitHub URL에서 스킬 설치 |
+
 > 전체 API 문서: [docs/api.md](docs/api.md)
 
 ---
@@ -318,10 +338,13 @@ cd src/ui && npx vite
 
 ```
 agent-harness-studio/
+├── .github/
+│   └── workflows/
+│       └── ci.yml                     # CI 파이프라인 (lint + test)
 ├── src/
 │   ├── scanner/
 │   │   ├── base_scanner.py          # 공통 scanner base
-│   │   ├── hermes_scanner.py        # ~/.hermes 상세 스캔 엔진
+│   │   ├── hermes_scanner.py        # ~/.hermes 상세 스캔 엔진 (1,053줄)
 │   │   ├── claude_scanner.py        # ~/.claude
 │   │   ├── codex_scanner.py         # ~/.codex
 │   │   ├── cursor_scanner.py        # ~/.cursor
@@ -330,7 +353,28 @@ agent-harness-studio/
 │   │   ├── antigravity_scanner.py   # ~/.gemini/antigravity
 │   │   └── studio_scanner.py        # agent-harness-studio 자체
 │   ├── server/
-│   │   ├── app.py                   # FastAPI 메인 앱 (모든 엔드포인트)
+│   │   ├── main.py                  # FastAPI 진입점 (86줄, 글로벌 에러 핸들러 포함)
+│   │   ├── app.py                   # 하위 호환 리다이렉터
+│   │   ├── routers/                 # API 엔드포인트 (14개 파일)
+│   │   │   ├── scan.py              #   /api/scan, /api/workspaces
+│   │   │   ├── mold.py              #   /api/mold (Chat Molder)
+│   │   │   ├── pi.py                #   /api/pi/* (Agent Runner)
+│   │   │   ├── git.py               #   /api/git/* (Git 연동)
+│   │   │   ├── convert.py           #   /api/convert/* (Skill Converter)
+│   │   │   ├── files.py             #   /api/read, /api/save, /api/rollback
+│   │   │   ├── actions.py           #   /api/actions/*
+│   │   │   ├── toggle.py            #   /api/toggle (훅/MCP 활성화/비활성화)
+│   │   │   ├── watch.py             #   /api/watch/events (SSE 파일 감시)
+│   │   │   ├── install.py           #   /api/install/skill (GitHub URL 스킬 설치)
+│   │   │   ├── sessions.py          #   /api/sessions/*
+│   │   │   ├── env.py               #   /api/env
+│   │   │   ├── web.py               #   /api/web/scrape
+│   │   │   └── audit.py             #   /api/audit/logs
+│   │   ├── services/                # 비즈니스 로직 (4개 파일)
+│   │   │   ├── config.py            #   HERMES_HOME, readonly, 경로 검증, 백업
+│   │   │   ├── git.py               #   git 연동 유틸리티
+│   │   │   ├── llm.py               #   LLM 클라이언트 + 비동기 호출
+│   │   │   └── pi.py                #   Pi Agent 실행 유틸리티
 │   │   ├── usage_tracker.py         # Claude/Codex 사용량 파서
 │   │   ├── recommender.py           # Smart Diet 추천 엔진
 │   │   └── scrapers/                # 하이브리드 웹 스크래퍼 파이프라인
@@ -341,9 +385,30 @@ agent-harness-studio/
 │   │       └── browser_scraper.py
 │   └── ui/
 │       └── src/
-│           ├── App.jsx              # 메인 React 컴포넌트
+│           ├── App.jsx              # 메인 React 컴포넌트 (2,775줄)
 │           ├── App.css              # 스타일 (다크 테마)
-│           └── ScrapingPipeline.jsx # 웹 스크래핑 결과 표시
+│           ├── components/          # 추출된 UI 컴포넌트 (5개)
+│           │   ├── EditorErrorBoundary.jsx
+│           │   ├── MarkdownContent.jsx
+│           │   ├── MolderMessage.jsx
+│           │   ├── ChatPanel.jsx
+│           │   └── AgentRunnerPanel.jsx
+│           ├── stores/              # Zustand 상태 관리 (4개)
+│           │   ├── useHarnessStore.js
+│           │   ├── useEditorStore.js
+│           │   ├── useChatStore.js
+│           │   └── useAgentRunnerStore.js
+│           ├── ArchitectureGraph.jsx # 아키텍처 다이어그램
+│           └── ScrapingPipeline.jsx  # 웹 스크래핑 결과 표시
+├── tests/                           # 테스트 스위트 (66개 테스트)
+│   ├── conftest.py                  # pytest 설정 + ASGI 클라이언트 fixture
+│   ├── pytest.ini                   # asyncio_mode = auto
+│   ├── api/
+│   │   ├── test_endpoints.py        # API 테스트 (18개)
+│   │   └── test_routers.py          # 라우터 통합 테스트 (26개)
+│   ├── test_scanner.py              # 스캐너 테스트 (10개)
+│   ├── test_services.py             # 서비스 테스트 (3개)
+│   └── test_install.py              # 스킬 설치 테스트 (9개)
 ├── docs/
 │   ├── api.md                       # API 레퍼런스
 │   ├── agent-runner-pi.md           # Pi Agent Runner 설계/구현 상태
@@ -378,6 +443,9 @@ httpx>=0.27.0              # async HTTP (Jina 스크래퍼)
 curl_cffi>=0.7.0           # Phase 3 TLS 스크래퍼
 playwright>=1.44.0         # Phase 4 브라우저 스크래퍼
 markdownify>=0.12.0        # HTML → Markdown 변환
+watchdog>=4.0.0            # 실시간 파일 감시 (선택, 미설치 시 폴링 폴백)
+pytest>=8.0.0              # 테스트 프레임워크
+pytest-asyncio>=0.24.0     # 비동기 테스트 지원
 ```
 
 ---
@@ -405,7 +473,7 @@ OPENAI_API_KEY=sk-...
 - **단일 사용자**: API 인증 없음. localhost 전용.
 - **대용량 스킬 디렉토리**: 스킬 수 >100개 시 스캔 속도 저하 가능 (동기 처리).
 - **브라우저 스크래퍼**: Phase 4 사용 시 `playwright install chromium` 필요.
-- **실시간 파일 감시 없음**: 변경 사항 반영을 위해 수동 새로고침 필요.
+- **watchdog 선택적 의존**: 실시간 파일 감시는 `watchdog` 설치 시 동작. 미설치 시 폴링 폴백 (성능 저하).
 
 ---
 
@@ -421,8 +489,6 @@ OPENAI_API_KEY=sk-...
 
 - 신규 에이전트 스캐너/runner adapter 추가
 - Claude → Hermes 외 추가 skill 변환 경로
-- WebSocket/SSE 기반 실시간 파일 감시
-- 훅/MCP 활성화 토글 UI
 - 하네스 프리셋 갤러리
 - diff 나란히 보기 (side-by-side)
 

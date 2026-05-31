@@ -224,6 +224,8 @@ Hermes 구조 요약과 현재 `HERMES_HOME` 스캔 스냅샷을 시스템 문�
 따라서 모델이 바뀌어도 skills, skill bundles, memory, MCP, hooks, cron, plugins,
 root context의 기본 위치와 스키마를 같은 기준으로 해석합니다.
 
+LLM 호출은 `httpx.AsyncClient`를 사용한 비동기로 처리됩니다 (`services/llm.py`의 `call_llm_async()`).
+
 **Request body (JSON):**
 ```json
 {
@@ -773,6 +775,114 @@ Git 연동 후 `/api/save` 요청에 `commit_message` 필드 추가 가능:
   "git": null
 }
 ```
+
+---
+
+## POST /api/toggle
+
+Toggle enable/disable for MCP servers and hooks in config.yaml.
+
+**Request body:**
+```json
+{
+  "path": "~/.hermes/config.yaml",
+  "section": "mcp_servers",
+  "name": "my-server",
+  "enabled": true
+}
+```
+
+| 필드 | 필수 | 설명 |
+|------|------|------|
+| `path` | 필수 | config.yaml 파일 경로 |
+| `section` | 필수 | `"mcp_servers"` 또는 `"hooks"` |
+| `name` | 필수 | 서버/훅 이름 |
+| `enabled` | 필수 | `true` = 활성화, `false` = 비활성화 |
+
+**Response (200):**
+```json
+{"status": "updated", "section": "mcp_servers", "name": "my-server", "enabled": true}
+```
+
+**Errors:** 403 (readonly), 404 (section/name not found)
+
+---
+
+## GET /api/watch/events
+
+SSE 엔드포인트. HERMES_HOME 디렉토리의 파일 변경을 실시간 스트리밍합니다.
+
+**Query params:**
+
+| 파라미터 | 기본값 | 설명 |
+|---------|--------|------|
+| `workspace` | HERMES_HOME | 감시할 워크스페이스 경로 |
+
+**SSE events:**
+```
+data: {"event": "modified", "path": "/path/to/file", "type": "file"}
+data: {"event": "created", "path": "/path/to/file", "type": "file"}
+data: {"event": "deleted", "path": "/path/to/file", "type": "file"}
+```
+
+`watchdog` 라이브러리가 설치된 경우 실시간 이벤트를 사용하고, 미설치 시 3초 간격 폴링으로 대체됩니다.
+
+### GET /api/watch/status
+
+현재 파일 감시 모드를 반환합니다.
+
+**Response:**
+```json
+{"mode": "watchdog", "available": true}
+```
+또는
+```json
+{"mode": "polling", "available": true}
+```
+
+---
+
+## POST /api/install/skill
+
+URL에서 스킬을 다운로드하여 설치합니다. GitHub blob/tree URL은 자동으로 raw.githubusercontent.com으로 변환됩니다.
+
+**Request body:**
+```json
+{
+  "url": "https://github.com/user/repo/blob/main/skills/my-skill/SKILL.md",
+  "target_workspace": "~/.hermes",
+  "name": "my-skill",
+  "dry_run": false
+}
+```
+
+| 필드 | 필수 | 설명 |
+|------|------|------|
+| `url` | 필수 | 스킬 파일 URL (http/https만 허용) |
+| `target_workspace` | 선택 | 설치할 워크스페이스 (기본값: HERMES_HOME) |
+| `name` | 선택 | 스킬 이름 오버라이드 (미지정 시 frontmatter에서 추출) |
+| `dry_run` | 선택 | `true`면 파일 쓰기 없이 결과만 반환 |
+
+**Response (dry run):**
+```json
+{
+  "status": "dry_run",
+  "skill_name": "my-skill",
+  "path": "~/.hermes/skills/my-skill/SKILL.md",
+  "content": "---\nname: my-skill\n..."
+}
+```
+
+**Response (installed):**
+```json
+{
+  "status": "installed",
+  "skill_name": "my-skill",
+  "path": "~/.hermes/skills/my-skill/SKILL.md"
+}
+```
+
+**Errors:** 403 (readonly), 400 (invalid URL), 502 (fetch failed)
 
 ---
 

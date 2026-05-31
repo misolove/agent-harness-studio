@@ -43,7 +43,7 @@ echo "[$(date)] 🚀 Starting Backend on http://localhost:8766 (HERMES_HOME=$HAR
 cd "$PROJECT_ROOT"
 HERMES_HOME="$HARNESS_HOME" \
 HARNESS_READONLY="${HARNESS_READONLY:-0}" \
-  python -m uvicorn src.server.app:app \
+  python -m uvicorn src.server.main:app \
     --host 0.0.0.0 \
     --port 8766 \
     --log-level info &
