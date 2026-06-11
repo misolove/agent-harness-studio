@@ -22,3 +22,10 @@ docs/build_pitch_pptx*.py
 # 백업 파일
 *.monolith.bak
 *.bak
+
+# Secrets — never commit real keys
+*.secret
+**/config.local.yaml
+**/config.prod.yaml
+secrets/
+.secrets
