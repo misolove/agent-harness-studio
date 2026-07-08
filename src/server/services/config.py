@@ -9,6 +9,16 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_HERMES_HOME = Path.home() / ".hermes"
 HERMES_HOME = Path(os.environ.get("HERMES_HOME", str(DEFAULT_HERMES_HOME)))
 HARNESS_READONLY = os.environ.get("HARNESS_READONLY", "").lower() in ("1", "true", "yes")
+HARNESS_HOST = os.environ.get("HARNESS_HOST", "127.0.0.1")
+HARNESS_API_TOKEN = os.environ.get("HARNESS_API_TOKEN", "")
+HARNESS_CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        "HARNESS_CORS_ORIGINS",
+        "http://127.0.0.1:5173,http://localhost:5173",
+    ).split(",")
+    if origin.strip()
+]
 DB_PATH = HERMES_HOME / "harness_studio.db"
 
 

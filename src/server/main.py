@@ -11,7 +11,14 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import uvicorn
 
-from services.config import HERMES_HOME, HARNESS_READONLY, init_db
+from services.config import (
+    HARNESS_API_TOKEN,
+    HARNESS_CORS_ORIGINS,
+    HARNESS_HOME,
+    HARNESS_HOST,
+    HARNESS_READONLY,
+    init_db,
+)
 
 init_db()
 
@@ -56,11 +63,24 @@ async def generic_exception_handler(request: Request, exc: Exception):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=HARNESS_CORS_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def require_api_token(request: Request, call_next):
+    public_paths = {"/health", "/docs", "/openapi.json"}
+    if HARNESS_API_TOKEN and request.method != "OPTIONS" and request.url.path not in public_paths:
+        auth_header = request.headers.get("authorization", "")
+        token_header = request.headers.get("x-harness-token", "")
+        bearer = f"Bearer {HARNESS_API_TOKEN}"
+        if auth_header != bearer and token_header != HARNESS_API_TOKEN:
+            return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    return await call_next(request)
+
 
 from routers import (
     scan, env, files, git, mold, pi, web, sessions, convert, actions, audit, watch, toggle, install
@@ -83,4 +103,4 @@ app.include_router(install.router)
 
 
 if __name__ == "__main__":
-    uvicorn.run("src.server.main:app", host="0.0.0.0", port=8766, reload=True)
+    uvicorn.run("src.server.main:app", host=HARNESS_HOST, port=8766, reload=True)
